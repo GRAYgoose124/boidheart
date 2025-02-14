@@ -8,14 +8,15 @@ local boidManager
 
 function love.load()
     love.window.setTitle("Boids Follower")
-    love.window.setMode(800, 600)
+    love.window.setMode(1920, 1080)
+    love.window.setFullscreen(true)
     
     player = Player.new(400, 300)
     boidManager = BoidManager.new()
     
     -- Create a group of boids that follow the player
     local boid_leader = nil
-    for i = 1, 20 do
+    for i = 1, 200 do
         local x = player.x + math.random(-50, 50)
         local y = player.y + math.random(-50, 50)
         local boid = Boid.new(x, y, player, boidManager)
@@ -49,3 +50,9 @@ function love.resize(w, h)
         boidManager.canvas = love.graphics.newCanvas()  -- Recreate canvas at new size
     end
 end 
+
+function love.keypressed(key)
+    if key == "escape" then
+        love.event.quit()
+    end
+end
