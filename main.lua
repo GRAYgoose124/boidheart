@@ -32,4 +32,11 @@ function love.draw()
     boidManager:draw()
     love.graphics.setColor(1, 1, 1)
     love.graphics.print("Use arrow keys or WASD to move", 10, 10)
+end
+
+function love.resize(w, h)
+    if boidManager then
+        boidManager.shader:send("resolution", {w, h})
+        boidManager.canvas = love.graphics.newCanvas()  -- Recreate canvas at new size
+    end
 end 
