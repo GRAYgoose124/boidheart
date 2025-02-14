@@ -25,14 +25,17 @@ function BoidManager:update(dt)
         boid:update(dt)
     end
     
-    -- Create array of vec2 positions
+    -- Create arrays of positions and velocities
     local positions = {}
+    local velocities = {}
     for i = 1, #self.boids do
-        positions[i] = {self.boids[i].x, self.boids[i].y}  -- Send as vec2
+        positions[i] = {self.boids[i].x, self.boids[i].y}
+        velocities[i] = {self.boids[i].vx, self.boids[i].vy}
     end
     
-    -- Send positions to shader
-    self.shader:send("boids", unpack(positions))  -- Unpack array of vec2s
+    -- Send data to shader
+    self.shader:send("boids", unpack(positions))
+    self.shader:send("velocities", unpack(velocities))
     self.shader:send("boidCount", #self.boids)
 end
 
