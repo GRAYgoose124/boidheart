@@ -37,6 +37,11 @@ function BoidManager:update(dt)
 end
 
 function BoidManager:draw()
+    -- Draw boids
+    for _, boid in ipairs(self.boids) do
+        boid:draw()
+    end
+    
     -- Draw field effect
     love.graphics.setCanvas(self.canvas)
     love.graphics.clear(0, 0, 0, 0)  -- Clear with transparency
@@ -53,10 +58,7 @@ function BoidManager:draw()
     love.graphics.draw(self.canvas)
     love.graphics.setBlendMode("alpha")
     
-    -- Draw boids
-    for _, boid in ipairs(self.boids) do
-        boid:draw()
-    end
+
 end
 
 return BoidManager 
