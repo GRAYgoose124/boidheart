@@ -19,13 +19,32 @@ function Boid.new(x, y, leader, manager)
     self.neighborRadius = 150
     self.cohesionWeight = 0.5
     self.alignmentWeight = 0.5
+    self.groupId = nil  -- For waypoint following
+    self.selected = false
     return self
 end
 
 function Boid:update(dt)
-    -- Base seeking behavior
-    local desiredX = self.leader.x - self.x
-    local desiredY = self.leader.y - self.y
+    local targetX, targetY
+    
+    -- Check for waypoints first
+    if self.groupId and self.boidManager.waypointManager then
+        local waypoint = self.boidManager.waypointManager:getNextWaypoint(self.groupId, self.x, self.y)
+        if waypoint then
+            targetX, targetY = waypoint.x, waypoint.y
+        end
+    end
+    
+    -- If no waypoint, follow leader
+    if not targetX and self.leader then
+        targetX, targetY = self.leader.x, self.leader.y
+    end
+    
+    if not targetX then return end -- No target to follow
+
+    -- Update steering behavior using targetX, targetY instead of leader position
+    local desiredX = targetX - self.x
+    local desiredY = targetY - self.y
     local distance = math.sqrt(desiredX^2 + desiredY^2)
     
     if distance > 0 then
@@ -95,6 +114,10 @@ function Boid:update(dt)
 end
 
 function Boid:draw()
+    if self.selected then
+        love.graphics.setColor(0, 1, 1)
+        love.graphics.circle("line", self.x, self.y, 8)
+    end
     love.graphics.setColor(1, 0, 0)
     love.graphics.circle("fill", self.x, self.y, 5)
 end

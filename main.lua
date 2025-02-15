@@ -5,6 +5,7 @@ local BoidManager = require "boid_manager"
 
 local player
 local boidManager
+local selecting = false
 
 function love.load()
     love.window.setTitle("Boids Follower")
@@ -42,6 +43,12 @@ function love.draw()
     boidManager:draw()
     love.graphics.setColor(1, 1, 1)
     love.graphics.print("Use arrow keys or WASD to move", 10, 10)
+    love.graphics.print([[
+Controls:
+WASD/Arrows: Move
+Space: Toggle selection mode
+Left click: Place waypoint for selected boids
+    ]], 10, 10)
 end
 
 function love.resize(w, h)
@@ -54,5 +61,32 @@ end
 function love.keypressed(key)
     if key == "escape" then
         love.event.quit()
+    elseif key == "space" then
+        selecting = not selecting
+        if selecting then
+            local x, y = love.mouse.getPosition()
+            boidManager:startSelection(x, y)
+        else
+            boidManager:endSelection()
+        end
+    end
+end
+
+function love.mousemoved(x, y)
+    if selecting then
+        boidManager.selectionX = x
+        boidManager.selectionY = y
+        boidManager:updateSelection(x, y)
+    end
+end
+
+function love.mousepressed(x, y, button)
+    if button == 1 and not selecting then
+        -- Add waypoint for selected boids
+        for _, boid in ipairs(boidManager.boids) do
+            if boid.selected and boid.groupId then
+                boidManager.waypointManager:addWaypoint(boid.groupId, x, y)
+            end
+        end
     end
 end

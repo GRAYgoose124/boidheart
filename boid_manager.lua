@@ -13,6 +13,12 @@ function BoidManager.new()
     local w, h = love.graphics.getDimensions()
     self.shader:send("resolution", {w, h})
     
+    self.waypointManager = require("waypoint_manager").new()
+    self.selectionRadius = 100
+    self.selecting = false
+    self.selectionX = 0
+    self.selectionY = 0
+    
     return self
 end
 
@@ -40,6 +46,24 @@ function BoidManager:update(dt)
 end
 
 function BoidManager:draw()
+    -- Draw selection circle if selecting
+    if self.selecting then
+        love.graphics.setColor(0, 1, 1, 0.3)
+        love.graphics.circle("line", self.selectionX, self.selectionY, self.selectionRadius)
+    end
+    
+    -- Draw waypoints
+    for groupId, path in pairs(self.waypointManager.paths) do
+        love.graphics.setColor(1, 1, 0, 0.5)
+        for i, waypoint in ipairs(path) do
+            love.graphics.circle("fill", waypoint.x, waypoint.y, 5)
+            if i > 1 then
+                local prev = path[i-1]
+                love.graphics.line(prev.x, prev.y, waypoint.x, waypoint.y)
+            end
+        end
+    end
+    
     -- Draw boids
     for _, boid in ipairs(self.boids) do
         boid:draw()
@@ -62,6 +86,36 @@ function BoidManager:draw()
     love.graphics.setBlendMode("alpha")
     
 
+end
+
+function BoidManager:startSelection(x, y)
+    self.selecting = true
+    self.selectionX = x
+    self.selectionY = y
+end
+
+function BoidManager:endSelection()
+    self.selecting = false
+    local selectedCount = 0
+    for _, boid in ipairs(self.boids) do
+        if boid.selected then
+            boid.groupId = self.waypointManager.currentGroupId
+            selectedCount = selectedCount + 1
+        end
+    end
+    
+    if selectedCount > 0 then
+        self.waypointManager.currentGroupId = self.waypointManager.currentGroupId + 1
+    end
+end
+
+function BoidManager:updateSelection(x, y)
+    for _, boid in ipairs(self.boids) do
+        local dx = boid.x - x
+        local dy = boid.y - y
+        local distance = math.sqrt(dx * dx + dy * dy)
+        boid.selected = distance <= self.selectionRadius
+    end
 end
 
 return BoidManager 
