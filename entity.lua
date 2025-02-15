@@ -7,8 +7,9 @@ function Entity.new(x, y)
     self.y = y
     self.vx = 0
     self.vy = 0
-    self.maxSpeed = 200
+    self.maxSpeed = 1000
     self.maxForce = 300
+    self.acceleration = self.maxSpeed / 2
     return self
 end
 
