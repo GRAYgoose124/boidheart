@@ -13,11 +13,11 @@ function love.load()
     love.window.setFullscreen(true)
     
     player = Player.new(400, 300)
-    boidManager = BoidManager.new()
+    boidManager = BoidManager.new(401)
     
     -- Create a group of boids that follow the player
     local boid_leader = nil
-    for i = 1, 200 do
+    for i = 1, (boidManager.maxBoids/2) do
         local x = player.x + math.random(-50, 50)
         local y = player.y + math.random(-50, 50)
         local boid = Boid.new(x, y, player, boidManager)
@@ -42,8 +42,9 @@ function love.draw()
     player:draw()
     boidManager:draw()
     love.graphics.setColor(1, 1, 1)
-    love.graphics.print("Use arrow keys or WASD to move", 10, 10)
     love.graphics.print([[
+Use arrow keys or WASD to move 
+
 Controls:
 WASD/Arrows: Move
 Space: Toggle selection mode

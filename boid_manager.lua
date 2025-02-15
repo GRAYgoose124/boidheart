@@ -1,12 +1,16 @@
 local BoidManager = {}
 BoidManager.__index = BoidManager
 
-function BoidManager.new()
+function BoidManager.new(maxBoids)
     local self = setmetatable({}, BoidManager)
     self.boids = {}
+    self.maxBoids = maxBoids
     
-    -- Initialize shader
-    self.shader = love.graphics.newShader("shaders/bounding_field.glsl")
+    -- Initialize shader with dynamic MAX_BOIDS
+    local shaderSource = love.filesystem.read("shaders/bounding_field.glsl")
+    shaderSource = shaderSource:gsub("#define MAX_BOIDS 100", "#define MAX_BOIDS " .. maxBoids)
+    
+    self.shader = love.graphics.newShader(shaderSource)
     self.canvas = love.graphics.newCanvas()
     
     -- Send initial resolution to shader
@@ -23,6 +27,10 @@ function BoidManager.new()
 end
 
 function BoidManager:add(boid)
+    if #self.boids >= self.maxBoids then
+        print("Warning: Attempted to add more boids than the maximum allowed.")
+        return
+    end
     table.insert(self.boids, boid)
 end
 
