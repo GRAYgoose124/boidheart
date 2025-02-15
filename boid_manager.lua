@@ -39,17 +39,19 @@ function BoidManager:update(dt)
         boid:update(dt)
     end
     
-    -- Create arrays of positions and velocities
-    local positions = {}
-    local velocities = {}
+    -- Create array of combined position and velocity data
+    local boidData = {}
     for i = 1, #self.boids do
-        positions[i] = {self.boids[i].x, self.boids[i].y}
-        velocities[i] = {self.boids[i].vx, self.boids[i].vy}
+        boidData[i] = {
+            self.boids[i].x, 
+            self.boids[i].y, 
+            self.boids[i].vx, 
+            self.boids[i].vy
+        }
     end
     
-    -- Send data to shader
-    self.shader:send("boids", unpack(positions))
-    self.shader:send("velocities", unpack(velocities))
+    -- Send combined data to shader
+    self.shader:send("boidData", unpack(boidData))
     self.shader:send("boidCount", #self.boids)
 end
 

@@ -12,20 +12,24 @@ function love.load()
     love.window.setMode(1920, 1080)
     love.window.setFullscreen(true)
     
-    player = Player.new(400, 300)
-    boidManager = BoidManager.new(401)
+    player = Player.new(love.graphics.getWidth()/2, love.graphics.getHeight()/2)
+    -- Max: ~1000 boids currently due to 1024 register shader limit.
+    -- TODO/FIX: Could only pass boids on screen, and up to a limit, dropping the farthest from the player?
+    boidManager = BoidManager.new(501)
     
     -- Create a group of boids that follow the player
     local boid_leader = nil
-    for i = 1, (boidManager.maxBoids/2) do
-        local x = player.x + math.random(-50, 50)
-        local y = player.y + math.random(-50, 50)
+    for i = 1, ((boidManager.maxBoids-1)/2) do
+        local x = player.x + math.random(-250, 250)
+        local y = player.y + math.random(-250, 250)
         local boid = Boid.new(x, y, player, boidManager)
         if not boid_leader then
             boid_leader = boid
         end
         local boid_follower = Boid.new(x, y, boid_leader, boidManager)
-        boid_leader = boid_follower
+        if i%3 == 0 then
+            boid_leader = boid_follower
+        end
         boidManager:add(boid)
         boidManager:add(boid_follower)
     end
