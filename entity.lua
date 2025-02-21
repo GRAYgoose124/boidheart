@@ -10,6 +10,7 @@ function Entity.new(x, y)
     self.maxSpeed = 1000
     self.maxForce = 300
     self.acceleration = self.maxSpeed / 2
+    self.groupId = 0
     return self
 end
 

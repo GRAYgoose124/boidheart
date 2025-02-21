@@ -38,4 +38,8 @@ function WaypointManager:getNextWaypoint(groupId, currentX, currentY)
     return waypoint
 end
 
+function WaypointManager:clearPath(groupId)
+    self.paths[groupId] = {}
+end
+
 return WaypointManager 

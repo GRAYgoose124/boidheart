@@ -117,6 +117,9 @@ function Boid:draw()
     if self.selected then
         love.graphics.setColor(0, 1, 1)
         love.graphics.circle("line", self.x, self.y, 8)
+        if self.groupId then
+            love.graphics.print(tostring(self.groupId), self.x, self.y)
+        end
     end
     love.graphics.setColor(1, 0, 0)
     love.graphics.circle("fill", self.x, self.y, 5)

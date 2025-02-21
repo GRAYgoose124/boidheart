@@ -128,4 +128,50 @@ function BoidManager:updateSelection(x, y)
     end
 end
 
+function BoidManager:cycleGroupSelection()
+    -- Get all unique group IDs and sort them
+    local groups = {}
+    local groupSet = {}
+    for _, boid in ipairs(self.boids) do
+        if boid.groupId and not groupSet[boid.groupId] then
+            table.insert(groups, boid.groupId)
+            groupSet[boid.groupId] = true
+        end
+    end
+    table.sort(groups)
+    
+    if #groups == 0 then return end
+    
+    -- Find current selected group
+    local currentGroup = nil
+    for _, boid in ipairs(self.boids) do
+        if boid.selected and boid.groupId then
+            currentGroup = boid.groupId
+            break
+        end
+    end
+    
+    -- Find next group to select
+    local nextGroup = groups[1]  -- Default to first group
+    if currentGroup then
+        for i, groupId in ipairs(groups) do
+            if groupId > currentGroup then
+                nextGroup = groupId
+                break
+            end
+        end
+    end
+    
+    -- Deselect all and select new group
+    for _, boid in ipairs(self.boids) do
+        boid.selected = (boid.groupId == nextGroup)
+    end
+end
+
+function BoidManager:selectGroup(groupId)
+    for _, boid in ipairs(self.boids) do
+        boid.selected = (boid.groupId == groupId)
+    end
+end
+
 return BoidManager 

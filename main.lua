@@ -53,6 +53,8 @@ Controls:
 WASD/Arrows: Move
 Space: Toggle selection mode
 Left click: Place waypoint for selected boids
+Delete: Clear waypoints for selected boids
+Tab: Cycle through boid groups
     ]], 10, 10)
 end
 
@@ -74,6 +76,15 @@ function love.keypressed(key)
         else
             boidManager:endSelection()
         end
+    elseif key == "delete" then
+        -- Clear waypoints for selected boids
+        for _, boid in ipairs(boidManager.boids) do
+            if boid.selected and boid.groupId then
+                boidManager.waypointManager:clearPath(boid.groupId)
+            end
+        end
+    elseif key == "tab" then
+        boidManager:cycleGroupSelection()
     end
 end
 
