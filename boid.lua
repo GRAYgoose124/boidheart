@@ -8,6 +8,10 @@ function Boid.new(x, y, leader, manager)
     setmetatable(self, Boid)
     self.leader = leader
     self.boidManager = manager
+    self.groupId = nil  -- For waypoint following
+    self.selected = false
+
+    -- physics
     self.maxSpeed = 150
     self.maxForce = 300
     self.vx = math.random(-50, 50)
@@ -19,8 +23,8 @@ function Boid.new(x, y, leader, manager)
     self.neighborRadius = 150
     self.cohesionWeight = 0.5
     self.alignmentWeight = 0.5
-    self.groupId = nil  -- For waypoint following
-    self.selected = false
+
+
     return self
 end
 

@@ -75,6 +75,7 @@ function love.keypressed(key)
             boidManager:startSelection(x, y)
         else
             boidManager:endSelection()
+            boidManager.waypointManager:createPath(boidManager.waypointManager.currentGroupId)
         end
     elseif key == "delete" then
         -- Clear waypoints for selected boids
@@ -84,7 +85,11 @@ function love.keypressed(key)
             end
         end
     elseif key == "tab" then
-        boidManager:cycleGroupSelection()
+        boidManager.waypointManager.currentGroupId = boidManager.waypointManager.currentGroupId + 1
+        if boidManager.waypointManager.currentGroupId > #boidManager.waypointManager.paths then
+            boidManager.waypointManager.currentGroupId = 1
+        end
+        boidManager:cycleGroupSelection(boidManager.waypointManager.currentGroupId)
     end
 end
 

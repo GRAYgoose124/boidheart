@@ -26,10 +26,10 @@ function WaypointManager:getNextWaypoint(groupId, currentX, currentY)
     local waypoint = path[1]
     local dx = waypoint.x - currentX
     local dy = waypoint.y - currentY
-    local distance = math.sqrt(dx * dx + dy * dy)
+    local distance = dx * dx + dy * dy
     
     -- If close enough to current waypoint, cycle to next
-    if distance < 50 then
+    if distance < 150 then
         table.remove(path, 1)
         table.insert(path, waypoint)
         return path[1]
@@ -40,6 +40,19 @@ end
 
 function WaypointManager:clearPath(groupId)
     self.paths[groupId] = {}
+end
+
+function WaypointManager:draw()
+    for groupId, path in pairs(self.paths) do
+        love.graphics.setColor(1, 1, 0, 0.5)
+        for i, waypoint in ipairs(path) do
+            love.graphics.circle("fill", waypoint.x, waypoint.y, 5)
+            if i > 1 then
+                local prev = path[i-1]
+                love.graphics.line(prev.x, prev.y, waypoint.x, waypoint.y)
+            end
+        end
+    end
 end
 
 return WaypointManager 

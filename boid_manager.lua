@@ -62,17 +62,16 @@ function BoidManager:draw()
         love.graphics.circle("line", self.selectionX, self.selectionY, self.selectionRadius)
     end
     
-    -- Draw waypoints
-    for groupId, path in pairs(self.waypointManager.paths) do
+    -- if selection has waypoints circle them
+    if self.waypointManager.paths[self.waypointManager.currentGroupId] then
         love.graphics.setColor(1, 1, 0, 0.5)
-        for i, waypoint in ipairs(path) do
-            love.graphics.circle("fill", waypoint.x, waypoint.y, 5)
-            if i > 1 then
-                local prev = path[i-1]
-                love.graphics.line(prev.x, prev.y, waypoint.x, waypoint.y)
-            end
+        for _, waypoint in ipairs(self.waypointManager.paths[self.waypointManager.currentGroupId]) do
+            love.graphics.circle("line", waypoint.x, waypoint.y, 10)
         end
     end
+
+    -- Draw waypoints
+    self.waypointManager:draw()
     
     -- Draw boids
     for _, boid in ipairs(self.boids) do
@@ -115,7 +114,7 @@ function BoidManager:endSelection()
     end
     
     if selectedCount > 0 then
-        self.waypointManager.currentGroupId = self.waypointManager.currentGroupId + 1
+        self.waypointManager.currentGroupId = self.waypointManager.currentGroupId+1
     end
 end
 
@@ -128,49 +127,10 @@ function BoidManager:updateSelection(x, y)
     end
 end
 
-function BoidManager:cycleGroupSelection()
-    -- Get all unique group IDs and sort them
-    local groups = {}
-    local groupSet = {}
-    for _, boid in ipairs(self.boids) do
-        if boid.groupId and not groupSet[boid.groupId] then
-            table.insert(groups, boid.groupId)
-            groupSet[boid.groupId] = true
-        end
-    end
-    table.sort(groups)
-    
-    if #groups == 0 then return end
-    
-    -- Find current selected group
-    local currentGroup = nil
-    for _, boid in ipairs(self.boids) do
-        if boid.selected and boid.groupId then
-            currentGroup = boid.groupId
-            break
-        end
-    end
-    
-    -- Find next group to select
-    local nextGroup = groups[1]  -- Default to first group
-    if currentGroup then
-        for i, groupId in ipairs(groups) do
-            if groupId > currentGroup then
-                nextGroup = groupId
-                break
-            end
-        end
-    end
-    
+function BoidManager:cycleGroupSelection(nextGroup)
     -- Deselect all and select new group
     for _, boid in ipairs(self.boids) do
         boid.selected = (boid.groupId == nextGroup)
-    end
-end
-
-function BoidManager:selectGroup(groupId)
-    for _, boid in ipairs(self.boids) do
-        boid.selected = (boid.groupId == groupId)
     end
 end
 
