@@ -61,8 +61,13 @@ end
 
 function love.resize(w, h)
     if boidManager then
-        boidManager.shader:send("resolution", {w, h})
-        boidManager.canvas = love.graphics.newCanvas()  -- Recreate canvas at new size
+        boidManager.fieldShader:send("resolution", {w, h})
+        boidManager.trailShader:send("resolution", {w, h})
+        boidManager.canvas = love.graphics.newCanvas()
+        boidManager.trailCanvas = {
+            love.graphics.newCanvas(),
+            love.graphics.newCanvas()
+        }
     end
 end 
 
@@ -117,6 +122,8 @@ function love.keypressed(key)
         boidManager:cycleGroupSelection(boidManager.waypointManager.currentGroupId)
     elseif key == "b" then
         boidManager.blockEditor:toggle()
+    elseif key == "f" then
+        boidManager:toggleShaderMode()
     end
 end
 

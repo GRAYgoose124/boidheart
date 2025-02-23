@@ -10,16 +10,28 @@ function BoidManager.new(maxBoids)
     self.maxBoids = maxBoids
     self.player = nil
     
-    -- Initialize shader with dynamic MAX_BOIDS
-    local shaderSource = love.filesystem.read("shaders/bounding_field.glsl")
-    shaderSource = shaderSource:gsub("#define MAX_BOIDS 100", "#define MAX_BOIDS " .. maxBoids)
+    -- Initialize shaders
+    local fieldShaderSource = love.filesystem.read("shaders/bounding_field.glsl")
+    fieldShaderSource = fieldShaderSource:gsub("#define MAX_BOIDS 100", "#define MAX_BOIDS " .. maxBoids)
+    self.fieldShader = love.graphics.newShader(fieldShaderSource)
     
-    self.shader = love.graphics.newShader(shaderSource)
+    self.trailShader = love.graphics.newShader("shaders/trail_shader.glsl")
+    self.trailShader:send("decay", 0.01) -- Adjust decay rate
+    
+    -- Create two canvases for trail effect (ping-pong buffering)
+    self.trailCanvas = {
+        love.graphics.newCanvas(),
+        love.graphics.newCanvas()
+    }
+    self.currentTrailCanvas = 1
+    
     self.canvas = love.graphics.newCanvas()
+    self.shaderMode = "field" -- or "trail"
     
-    -- Send initial resolution to shader
+    -- Send initial resolution to shaders
     local w, h = love.graphics.getDimensions()
-    self.shader:send("resolution", {w, h})
+    self.fieldShader:send("resolution", {w, h})
+    self.trailShader:send("resolution", {w, h})
     
     self.waypointManager = require("waypoint_manager").new()
     self.selectionRadius = 100
@@ -57,8 +69,8 @@ function BoidManager:update(dt)
     end
     
     -- Send combined data to shader
-    self.shader:send("boidData", unpack(boidData))
-    self.shader:send("boidCount", #self.boids)
+    self.fieldShader:send("boidData", unpack(boidData))
+    self.fieldShader:send("boidCount", #self.boids)
 end
 
 function BoidManager:draw()
@@ -79,29 +91,72 @@ function BoidManager:draw()
     -- Draw waypoints
     self.waypointManager:draw()
     
+    if self.shaderMode == "field" then
+        self:drawFieldEffect()
+    else
+        self:drawTrailEffect()
+    end
+    
     -- Draw boids
     for _, boid in ipairs(self.boids) do
         boid:draw()
     end
     
-    -- Draw field effect
+    -- Draw block editor on top
+    self.blockEditor:draw()
+end
+
+function BoidManager:drawFieldEffect()
     love.graphics.setCanvas(self.canvas)
-    love.graphics.clear(0, 0, 0, 0)  -- Clear with transparency
+    love.graphics.clear(0, 0, 0, 0)
     
-    love.graphics.setShader(self.shader)
-    love.graphics.setColor(1, 1, 1, 1)  -- Full opacity for shader
+    love.graphics.setShader(self.fieldShader)
+    love.graphics.setColor(1, 1, 1, 1)
     love.graphics.rectangle("fill", 0, 0, love.graphics.getDimensions())
     love.graphics.setShader()
     love.graphics.setCanvas()
     
-    -- Draw the field effect
     love.graphics.setBlendMode("add")
-    love.graphics.setColor(1, 1, 1, 0.5)  -- Control overall field opacity
+    love.graphics.setColor(1, 1, 1, 0.5)
     love.graphics.draw(self.canvas)
     love.graphics.setBlendMode("alpha")
+end
+
+function BoidManager:drawTrailEffect()
+    -- Swap canvases
+    self.currentTrailCanvas = self.currentTrailCanvas == 1 and 2 or 1
+    local source = self.trailCanvas[self.currentTrailCanvas == 1 and 2 or 1]
+    local target = self.trailCanvas[self.currentTrailCanvas]
     
-    -- Draw block editor on top
-    self.blockEditor:draw()
+    -- Apply decay shader to previous frame
+    love.graphics.setCanvas(target)
+    love.graphics.clear()
+    love.graphics.setShader(self.trailShader)
+    love.graphics.draw(source)
+    love.graphics.setShader()
+    
+    -- Draw new boid positions
+    love.graphics.setBlendMode("add")
+    for _, boid in ipairs(self.boids) do
+        -- Color based on velocity
+        local speed = math.sqrt(boid.vx * boid.vx + boid.vy * boid.vy)
+        local normalizedSpeed = speed / boid.maxSpeed
+        love.graphics.setColor(
+            0.5 + normalizedSpeed * 0.5,  -- More red with speed
+            0.2,
+            0.5 - normalizedSpeed * 0.3,  -- Less blue with speed
+            0.1  -- Low alpha for trail buildup
+        )
+        love.graphics.circle("fill", boid.x, boid.y, 3 + normalizedSpeed * 2)
+    end
+    love.graphics.setBlendMode("alpha")
+    love.graphics.setCanvas()
+    
+    -- Draw the result
+    love.graphics.setBlendMode("add")
+    love.graphics.setColor(1, 1, 1, 0.8)
+    love.graphics.draw(target)
+    love.graphics.setBlendMode("alpha")
 end
 
 function BoidManager:startSelection(x, y)
@@ -143,6 +198,18 @@ end
 
 function BoidManager:setPlayer(player)
     self.player = player
+end
+
+function BoidManager:toggleShaderMode()
+    self.shaderMode = self.shaderMode == "field" and "trail" or "field"
+    -- Clear trail canvases when switching to trail mode
+    if self.shaderMode == "trail" then
+        love.graphics.setCanvas(self.trailCanvas[1])
+        love.graphics.clear()
+        love.graphics.setCanvas(self.trailCanvas[2])
+        love.graphics.clear()
+        love.graphics.setCanvas()
+    end
 end
 
 return BoidManager 
