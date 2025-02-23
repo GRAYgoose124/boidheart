@@ -16,6 +16,7 @@ function love.load()
     -- Max: ~1000 boids currently due to 1024 register shader limit.
     -- TODO/FIX: Could only pass boids on screen, and up to a limit, dropping the farthest from the player?
     boidManager = BoidManager.new(501)
+    boidManager:setPlayer(player)
     
     -- Create a group of boids that follow the player
     local boid_leader = nil
@@ -67,8 +68,32 @@ end
 
 function love.keypressed(key)
     if key == "escape" then
+        if boidManager.blockEditor.editorVisible then
+            boidManager.blockEditor:toggle()  -- Close editor with escape
+            return
+        end
         love.event.quit()
-    elseif key == "space" then
+    elseif boidManager.blockEditor.editorVisible then
+        if key == "n" then
+            local name = "Program" .. (#boidManager.blockEditor.programs + 1)
+            boidManager.blockEditor:newProgram(name)
+        elseif key == "s" then
+            boidManager.blockEditor:saveProgram()
+        elseif key == "l" then
+            -- TODO: Add proper program selection UI
+            local firstProgram = next(boidManager.blockEditor.programs)
+            if firstProgram then
+                boidManager.blockEditor:loadProgram(firstProgram)
+            end
+        elseif key == "h" then
+            boidManager.blockEditor.showHelp = not boidManager.blockEditor.showHelp
+        elseif key == "return" then
+            boidManager.blockEditor:applyToSelected(boidManager.boids)
+        end
+        return
+    end
+    
+    if key == "space" then
         selecting = not selecting
         if selecting then
             local x, y = love.mouse.getPosition()
@@ -90,10 +115,16 @@ function love.keypressed(key)
             boidManager.waypointManager.currentGroupId = 1
         end
         boidManager:cycleGroupSelection(boidManager.waypointManager.currentGroupId)
+    elseif key == "b" then
+        boidManager.blockEditor:toggle()
     end
 end
 
 function love.mousemoved(x, y)
+    if boidManager.blockEditor.editorVisible then
+        boidManager.blockEditor:mousemoved(x, y)
+        return
+    end
     if selecting then
         boidManager.selectionX = x
         boidManager.selectionY = y
@@ -102,6 +133,10 @@ function love.mousemoved(x, y)
 end
 
 function love.mousepressed(x, y, button)
+    if boidManager.blockEditor.editorVisible then
+        boidManager.blockEditor:mousepressed(x, y, button)
+        return
+    end
     if button == 1 and not selecting then
         -- Add waypoint for selected boids
         for _, boid in ipairs(boidManager.boids) do
@@ -109,5 +144,12 @@ function love.mousepressed(x, y, button)
                 boidManager.waypointManager:addWaypoint(boid.groupId, x, y)
             end
         end
+    end
+end
+
+function love.mousereleased(x, y, button)
+    if boidManager.blockEditor.editorVisible then
+        boidManager.blockEditor:mousereleased(x, y, button)
+        return
     end
 end

@@ -1,10 +1,14 @@
 local BoidManager = {}
 BoidManager.__index = BoidManager
 
+-- Add to the top of the file after other requires
+local BlockEditor = require "block_editor"
+
 function BoidManager.new(maxBoids)
     local self = setmetatable({}, BoidManager)
     self.boids = {}
     self.maxBoids = maxBoids
+    self.player = nil
     
     -- Initialize shader with dynamic MAX_BOIDS
     local shaderSource = love.filesystem.read("shaders/bounding_field.glsl")
@@ -22,6 +26,8 @@ function BoidManager.new(maxBoids)
     self.selecting = false
     self.selectionX = 0
     self.selectionY = 0
+    
+    self.blockEditor = BlockEditor.new()
     
     return self
 end
@@ -94,7 +100,8 @@ function BoidManager:draw()
     love.graphics.draw(self.canvas)
     love.graphics.setBlendMode("alpha")
     
-
+    -- Draw block editor on top
+    self.blockEditor:draw()
 end
 
 function BoidManager:startSelection(x, y)
@@ -132,6 +139,10 @@ function BoidManager:cycleGroupSelection(nextGroup)
     for _, boid in ipairs(self.boids) do
         boid.selected = (boid.groupId == nextGroup)
     end
+end
+
+function BoidManager:setPlayer(player)
+    self.player = player
 end
 
 return BoidManager 

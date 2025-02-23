@@ -24,11 +24,44 @@ function Boid.new(x, y, leader, manager)
     self.cohesionWeight = 0.5
     self.alignmentWeight = 0.5
 
+    self.behaviors = {}
 
     return self
 end
 
 function Boid:update(dt)
+    -- Execute behaviors first
+    for triggerType, actions in pairs(self.behaviors or {}) do
+        local shouldExecute = false
+        
+        if triggerType == "ALWAYS" then
+            shouldExecute = true
+        elseif triggerType == "ON_WAYPOINT" then
+            -- Check if near current waypoint
+            if self.groupId then
+                local waypoint = self.boidManager.waypointManager:getNextWaypoint(self.groupId, self.x, self.y)
+                if waypoint then
+                    local dx = waypoint.x - self.x
+                    local dy = waypoint.y - self.y
+                    shouldExecute = (dx * dx + dy * dy) < 150
+                end
+            end
+        elseif triggerType == "NEAR_PLAYER" then
+            local dx = self.boidManager.player.x - self.x
+            local dy = self.boidManager.player.y - self.y
+            local distSq = dx * dx + dy * dy
+            -- Fix: Check if actions[1] and its params exist before accessing
+            local targetDist = (actions[1] and actions[1].params and actions[1].params.distance) or 100
+            shouldExecute = distSq < (targetDist * targetDist)
+        end
+        
+        if shouldExecute then
+            for _, action in ipairs(actions) do
+                self:executeAction(action)
+            end
+        end
+    end
+
     local targetX, targetY
     
     -- Check for waypoints first
@@ -127,6 +160,27 @@ function Boid:draw()
     end
     love.graphics.setColor(1, 0, 0)
     love.graphics.circle("fill", self.x, self.y, 5)
+end
+
+function Boid:executeAction(action)
+    if action.type == "FOLLOW_PLAYER" then
+        local weight = action.params.weight or 1.0
+        local dx = self.boidManager.player.x - self.x
+        local dy = self.boidManager.player.y - self.y
+        self:applyForce(dx * weight, dy * weight)
+    
+    elseif action.type == "FLOCK" then
+        local sep = action.params.separation or 1.0
+        local coh = action.params.cohesion or 1.0
+        local ali = action.params.alignment or 1.0
+        
+        self.separationWeight = sep
+        self.cohesionWeight = coh
+        self.alignmentWeight = ali
+    
+    elseif action.type == "SET_SPEED" then
+        self.maxSpeed = action.params.speed or 150
+    end
 end
 
 return Boid 
