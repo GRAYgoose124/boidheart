@@ -28,28 +28,55 @@ local PARAMETER_TYPES = {
     
     dropdown = {
         draw = function(param, value, x, y, width)
-            -- Draw dropdown box
+            -- Draw dropdown background
             love.graphics.setColor(0.3, 0.3, 0.3)
             love.graphics.rectangle("fill", x, y, width, 20)
+            
+            -- Draw current value and label
             love.graphics.setColor(1, 1, 1)
             love.graphics.print(param.name .. ": " .. tostring(value), x + 5, y + 2)
+            
+            -- Draw dropdown arrow
+            love.graphics.setColor(0.8, 0.8, 0.8)
+            love.graphics.polygon("fill",
+                x + width - 15, y + 5,
+                x + width - 5, y + 5,
+                x + width - 10, y + 15)
         end,
         
         handleInput = function(param, value, x, y, width, editor)
             local mx, my = love.mouse.getPosition()
+            
+            -- Toggle dropdown on click
             if my >= y and my <= y + 20 and mx >= x and mx <= x + width then
-                if love.mouse.isDown(1) and not editor.activeDropdown then
-                    editor.activeDropdown = {
-                        param = param,
-                        x = x,
-                        y = y + 20,
-                        width = width,
-                        options = param.options,
-                        currentValue = value,
-                        callback = function(selected) return selected end
-                    }
+                if love.mouse.isDown(1) and not param.clicked then
+                    param.clicked = true
+                    -- Toggle dropdown
+                    if editor.uiManager.activeDropdown and editor.uiManager.activeDropdown.param == param then
+                        editor.uiManager.activeDropdown = nil
+                    else
+                        editor.uiManager.activeDropdown = {
+                            x = x,
+                            y = y + 20,
+                            width = width,
+                            options = param.options,
+                            currentValue = value,
+                            param = param
+                        }
+                    end
+                end
+            elseif editor.uiManager.activeDropdown and editor.uiManager.activeDropdown.param == param then
+                -- Handle dropdown selection
+                local handled, newValue = editor.uiManager:handleMousePressed(mx, my, 1)
+                if handled and newValue then
+                    return newValue
                 end
             end
+            
+            if not love.mouse.isDown(1) then
+                param.clicked = false
+            end
+            
             return value
         end
     },

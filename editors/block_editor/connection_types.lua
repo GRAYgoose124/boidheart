@@ -19,9 +19,15 @@ local CONNECTION_TYPES = {
     },
     number = {
         name = "Number",
-        color = {0.4, 0.4, 0.8},
+        color = {0.2, 0.6, 0.0},
         shape = "circle",
         radius = 4
+    },
+    state = {
+        name = "State",
+        color = {0.8, 0.4, 0.8},
+        shape = "circle",
+        radius = 8
     }
 }
 

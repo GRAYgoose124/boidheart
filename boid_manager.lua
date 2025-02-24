@@ -84,14 +84,6 @@ function BoidManager:draw()
         love.graphics.circle("line", self.selectionX, self.selectionY, self.selectionRadius)
     end
     
-    -- if selection has waypoints circle them
-    if self.waypointManager.paths[self.waypointManager.currentGroupId] then
-        love.graphics.setColor(1, 1, 0, 0.5)
-        for _, waypoint in ipairs(self.waypointManager.paths[self.waypointManager.currentGroupId]) do
-            love.graphics.circle("line", waypoint.x, waypoint.y, 10)
-        end
-    end
-
     -- Draw waypoints
     self.waypointManager:draw()
     
@@ -172,15 +164,17 @@ end
 function BoidManager:endSelection()
     self.selecting = false
     local selectedCount = 0
+    local newGroupId = #self.waypointManager.paths + 1
     for _, boid in ipairs(self.boids) do
         if boid.selected then
-            boid.groupId = self.waypointManager.currentGroupId
+            boid.groupId = newGroupId
             selectedCount = selectedCount + 1
         end
     end
     
     if selectedCount > 0 then
-        self.waypointManager.currentGroupId = self.waypointManager.currentGroupId+1
+        self.waypointManager:createPath(newGroupId)
+        self.waypointManager.currentGroupId = newGroupId
     end
 end
 
@@ -193,7 +187,9 @@ function BoidManager:updateSelection(x, y)
     end
 end
 
-function BoidManager:cycleGroupSelection(nextGroup)
+function BoidManager:cycleGroupSelection()
+    self.waypointManager:cycleGroupId()
+    local nextGroup = self.waypointManager.currentGroupId
     -- Deselect all and select new group
     for _, boid in ipairs(self.boids) do
         boid.selected = (boid.groupId == nextGroup)

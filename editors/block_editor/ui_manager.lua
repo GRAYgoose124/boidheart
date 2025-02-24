@@ -33,39 +33,64 @@ function UIManager:drawOverlay()
 end
 
 function UIManager:drawDropdownMenu(dropdown)
-    love.graphics.setColor(0.2, 0.2, 0.2, 0.95)
-    love.graphics.rectangle("fill", dropdown.x, dropdown.y, 
-        dropdown.width, #dropdown.options * 20)
+    -- Draw semi-transparent background
+    love.graphics.setColor(0, 0, 0, 0.5)
+    love.graphics.rectangle("fill", 0, 0, love.graphics.getWidth(), love.graphics.getHeight())
     
+    -- Draw dropdown background
+    love.graphics.setColor(0.2, 0.2, 0.2, 0.95)
+    love.graphics.rectangle("fill", 
+        dropdown.x, 
+        dropdown.y, 
+        dropdown.width, 
+        #dropdown.options * 20)
+    
+    -- Draw options
+    local mx, my = love.mouse.getPosition()
     for i, option in ipairs(dropdown.options) do
         local y = dropdown.y + (i-1) * 20
-        -- Highlight on hover
-        local mx, my = love.mouse.getPosition()
-        if my >= y and my <= y + 20 and 
-           mx >= dropdown.x and mx <= dropdown.x + dropdown.width then
-            love.graphics.setColor(0.3, 0.3, 0.3)
+        
+        -- Highlight hovered option
+        if mx >= dropdown.x and mx <= dropdown.x + dropdown.width and
+           my >= y and my <= y + 20 then
+            love.graphics.setColor(0.4, 0.4, 0.6)
+            love.graphics.rectangle("fill", dropdown.x, y, dropdown.width, 20)
+        -- Highlight current value
+        elseif option == dropdown.currentValue then
+            love.graphics.setColor(0.3, 0.3, 0.4)
             love.graphics.rectangle("fill", dropdown.x, y, dropdown.width, 20)
         end
+        
+        -- Draw option text
         love.graphics.setColor(1, 1, 1)
         love.graphics.print(option, dropdown.x + 5, y + 2)
     end
 end
 
 function UIManager:handleMousePressed(x, y, button)
+    if button ~= 1 then return false end
+    
+    -- Handle dropdown selection
     if self.activeDropdown then
-        -- Handle dropdown selection
-        for i, option in ipairs(self.activeDropdown.options) do
-            local optionY = self.activeDropdown.y + (i-1) * 20
-            if y >= optionY and y <= optionY + 20 and
-               x >= self.activeDropdown.x and x <= self.activeDropdown.x + self.activeDropdown.width then
-                self.activeDropdown.callback(option)
-                self.activeDropdown = nil
-                return true
+        local dropdown = self.activeDropdown
+        
+        -- Check if click is on an option
+        if x >= dropdown.x and x <= dropdown.x + dropdown.width then
+            local optionY = dropdown.y
+            for i, option in ipairs(dropdown.options) do
+                if y >= optionY and y <= optionY + 20 then
+                    self.activeDropdown = nil
+                    return true, option
+                end
+                optionY = optionY + 20
             end
         end
+        
+        -- Click outside dropdown closes it
         self.activeDropdown = nil
         return true
     end
+    
     return false
 end
 

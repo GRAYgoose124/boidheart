@@ -115,7 +115,7 @@ function love.keypressed(key)
             end
         end
     elseif key == "tab" then
-        boidManager.blockEditor:toggle()
+        boidManager:cycleGroupSelection()
     elseif key == "b" then
         boidManager.blockEditor:toggle()
     elseif key == "f" then
@@ -153,6 +153,13 @@ end
 function love.mousereleased(x, y, button)
     if boidManager.blockEditor.editorVisible then
         boidManager.blockEditor:mousereleased(x, y, button)
+        return
+    end
+end
+
+function love.wheelmoved(x, y)
+    if boidManager.blockEditor.editorVisible then
+        boidManager.blockEditor:wheelmoved(x, y)
         return
     end
 end

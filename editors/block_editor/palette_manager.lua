@@ -2,6 +2,7 @@ local PaletteManager = {}
 PaletteManager.__index = PaletteManager
 
 local BLOCK_TYPES = require "editors.block_editor.block_types"
+local CONNECTION_TYPES = require "editors.block_editor.connection_types"
 
 function PaletteManager.new(editor)
     local self = setmetatable({}, PaletteManager)
@@ -63,28 +64,31 @@ function PaletteManager:drawBlockPreview(config, y)
             self.paletteX + self.editor.blockWidth * 0.7, y + 5)
     end
     
-    -- Draw connection points preview
+    -- Draw connection points preview with proper types
     if config.inputs then
-        love.graphics.setColor(0.5, 0.5, 0.5)
-        love.graphics.circle("fill", self.paletteX, 
-            y + self.editor.blockHeight * 0.4, 4)
+        for i, input in ipairs(config.inputs) do
+            local x = self.paletteX
+            local y = y + self.editor.blockHeight * 0.4 + (i-1) * 15
+            self.editor.connectionManager:drawConnectionPoint(x, y, input.type or "flow", true)
+        end
     end
     if config.outputs then
-        love.graphics.setColor(0.5, 0.5, 0.5)
-        love.graphics.circle("fill", 
-            self.paletteX + self.editor.blockWidth * 0.8,
-            y + self.editor.blockHeight * 0.4, 4)
+        for i, output in ipairs(config.outputs) do
+            local x = self.paletteX + self.editor.blockWidth * 0.8
+            local y = y + self.editor.blockHeight * 0.4 + (i-1) * 15
+            self.editor.connectionManager:drawConnectionPoint(x, y, output.type or "flow", false)
+        end
     end
 end
 
 function PaletteManager:handleMousePressed(x, y, button)
-    if x < self.paletteWidth + self.paletteX * 2 then
+    if x >= self.paletteX and x <= self.paletteX + self.paletteWidth then
         local blockType = self:findBlockAtPosition(x, y)
         if blockType then
-            -- Create new block instance
+            -- Create new block instance at mouse position
             local block = {
                 config = blockType,
-                x = x,
+                x = x - self.paletteX,  -- Adjust x position relative to palette
                 y = y,
                 params = {}
             }
@@ -95,7 +99,7 @@ function PaletteManager:handleMousePressed(x, y, button)
                 end
             end
             self.editor.blockManager.draggingBlock = block
-            self.editor.blockManager.draggingOffset = {x = x - block.x, y = y - block.y}
+            self.editor.blockManager.draggingOffset = {x = self.paletteX, y = 0}
             return true
         end
     end
@@ -104,23 +108,46 @@ end
 
 function PaletteManager:handleWheelMoved(x, y)
     if x < self.paletteWidth + self.paletteX * 2 then
-        self.scrollY = math.max(0, math.min(self.maxScrollY, 
-            self.scrollY - y * self.scrollSpeed))
+        -- Adjust scroll speed and direction
+        local newScrollY = self.scrollY - y * self.scrollSpeed
+        self.scrollY = math.max(0, math.min(self.maxScrollY, newScrollY))
         return true
     end
     return false
 end
 
 function PaletteManager:findBlockAtPosition(x, y)
-    local currentY = self.paletteY - self.scrollY
+    -- Adjust x position to be relative to palette
+    local relativeX = x - self.paletteX
+    if relativeX < 0 or relativeX > self.paletteWidth then
+        return nil
+    end
+
+    -- Adjust y position for scrolling
+    local adjustedY = y + self.scrollY
+    local currentY = self.paletteY
+    
     for category, blocks in pairs(BLOCK_TYPES) do
-        currentY = currentY + 25 -- Category header
+        -- Category header height
+        currentY = currentY + 25
+        
         for name, config in pairs(blocks) do
-            if y >= currentY and y <= currentY + self.editor.blockHeight * 0.8 then
-                return config
+            local blockHeight = self.editor.blockHeight * 0.8
+            if adjustedY >= currentY and adjustedY <= currentY + blockHeight then
+                -- Create a deep copy of the config
+                local blockConfig = {}
+                for k, v in pairs(config) do
+                    if type(v) == "table" then
+                        blockConfig[k] = table.deepcopy(v)
+                    else
+                        blockConfig[k] = v
+                    end
+                end
+                return blockConfig
             end
-            currentY = currentY + self.editor.blockHeight * 0.8 + self.paletteSpacing
+            currentY = currentY + blockHeight + self.paletteSpacing
         end
+        currentY = currentY + self.paletteSpacing * 2
     end
     return nil
 end
@@ -142,6 +169,21 @@ end
 function PaletteManager:handleMouseReleased(x, y, button)
     -- Add if needed for consistency
     return false
+end
+
+function table.deepcopy(orig)
+    local orig_type = type(orig)
+    local copy
+    if orig_type == 'table' then
+        copy = {}
+        for orig_key, orig_value in next, orig, nil do
+            copy[table.deepcopy(orig_key)] = table.deepcopy(orig_value)
+        end
+        setmetatable(copy, table.deepcopy(getmetatable(orig)))
+    else
+        copy = orig
+    end
+    return copy
 end
 
 return PaletteManager 

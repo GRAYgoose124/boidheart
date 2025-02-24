@@ -93,20 +93,29 @@ function BlockManager:handleMousePressed(x, y, button)
         if x >= block.x and x <= block.x + self.editor.blockWidth and
            y >= block.y and y <= block.y + self.editor.blockHeight then
             
-            -- Check for parameter interaction
+            -- Check for parameter interaction first
             if block.config.params then
                 local paramY = block.y + 30
                 for _, param in ipairs(block.config.params) do
                     local paramType = PARAMETER_TYPES[param.type]
                     if paramType and paramType.handleInput then
-                        local newValue = paramType.handleInput(param, 
-                            block.params[param.name], 
-                            block.x + 10, paramY, 
-                            self.editor.blockWidth - 20,
-                            self.editor)
-                        if newValue ~= block.params[param.name] then
-                            block.params[param.name] = newValue
-                            return true
+                        -- Check if click is within parameter bounds
+                        local paramHeight = (param.type == "dropdown") and 20 or 10
+                        if y >= paramY and y <= paramY + paramHeight and
+                           x >= block.x + 10 and x <= block.x + self.editor.blockWidth - 10 then
+                            local newValue = paramType.handleInput(param, 
+                                block.params[param.name], 
+                                block.x + 10, paramY, 
+                                self.editor.blockWidth - 20,
+                                self.editor)
+                            if newValue ~= block.params[param.name] then
+                                block.params[param.name] = newValue
+                                return true
+                            end
+                            -- Return true even if value didn't change to prevent block dragging
+                            if param.type == "dropdown" then
+                                return true
+                            end
                         end
                     end
                     paramY = paramY + 25

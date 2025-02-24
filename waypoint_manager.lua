@@ -51,7 +51,18 @@ function WaypointManager:draw()
                 local prev = path[i-1]
                 love.graphics.line(prev.x, prev.y, waypoint.x, waypoint.y)
             end
+            if self.currentGroupId == groupId then
+                love.graphics.circle("line", waypoint.x, waypoint.y, 10)
+            end
         end
+    end
+end
+
+
+function WaypointManager:cycleGroupId()
+    self.currentGroupId = self.currentGroupId + 1
+    if self.currentGroupId > #self.paths then
+        self.currentGroupId = 0
     end
 end
 
