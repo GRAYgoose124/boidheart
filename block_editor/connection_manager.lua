@@ -153,6 +153,15 @@ function ConnectionManager:bezierPoint(t, x1, y1, x2, y2, x3, y3, x4, y4)
            y1 * t3 + 3 * y2 * t2 * t + 3 * y3 * t1 * tt + y4 * ttt
 end
 
+function ConnectionManager:startDraggingConnection(block, index, isInput, type)
+    self.draggingConnection = {
+        source = block,
+        outputIndex = index,
+        isInput = isInput,
+        type = type
+    }
+end
+
 function ConnectionManager:handleMousePressed(x, y, button)
     if button ~= 1 then return false end
     
@@ -160,61 +169,43 @@ function ConnectionManager:handleMousePressed(x, y, button)
     for _, block in ipairs(self.editor.blockManager.blocks) do
         local connectionPoint = self:findConnectionPoint(block, x, y)
         if connectionPoint then
+            -- Get the connection type from the block's config
+            local type
             if connectionPoint.isInput then
-                -- Find and disconnect existing connection to this input
-                self:disconnectInput(block, connectionPoint.index)
+                type = block.config.inputs[connectionPoint.index].type
+            else
+                type = block.config.outputs[connectionPoint.index].type
             end
             
-            -- Store connection info including type
-            local type = connectionPoint.isInput and 
-                block.config.inputs[connectionPoint.index].type or
-                block.config.outputs[connectionPoint.index].type
-                
-            self.draggingConnection = {
-                source = block,
-                outputIndex = connectionPoint.index,
-                isInput = connectionPoint.isInput,
-                type = type
-            }
+            self:startDraggingConnection(block, connectionPoint.index, 
+                connectionPoint.isInput, type)
             return true
         end
     end
+    
     return false
 end
 
 function ConnectionManager:handleMouseReleased(x, y, button)
     if not self.draggingConnection then return false end
     
-    -- Find target connection point
-    for _, block in ipairs(self.editor.blockManager.blocks) do
-        local connectionPoint = self:findConnectionPoint(block, x, y)
-        if connectionPoint then
-            -- Get the correct source and target blocks and types
-            local sourceBlock = self.draggingConnection.source
-            local sourceIndex = self.draggingConnection.outputIndex
-            local sourceType, targetType
-            
-            if self.draggingConnection.isInput then
-                -- If dragging from input, swap the types
-                sourceType = block.config.outputs[connectionPoint.index].type
-                targetType = sourceBlock.config.inputs[sourceIndex].type
-            else
-                -- If dragging from output
-                sourceType = sourceBlock.config.outputs[sourceIndex].type
-                targetType = block.config.inputs[connectionPoint.index].type
-            end
-            
-            if self:isConnectionCompatible(sourceType, targetType) then
-                if self.draggingConnection.isInput then
-                    -- Swap source and target for input dragging
-                    self:createConnection(block, sourceBlock, 
-                        connectionPoint.index, sourceIndex)
-                else
-                    self:createConnection(sourceBlock, block,
-                        sourceIndex, connectionPoint.index)
-                end
-            end
-            break
+    local snapTarget = self:findSnapTarget(x, y)
+    if snapTarget and snapTarget.block then  -- Add check for block
+        if self.draggingConnection.isInput then
+            -- If dragging from input, swap source and target
+            self:createConnection(
+                snapTarget.block,
+                self.draggingConnection.source,
+                snapTarget.index,
+                self.draggingConnection.outputIndex
+            )
+        else
+            self:createConnection(
+                self.draggingConnection.source,
+                snapTarget.block,
+                self.draggingConnection.outputIndex,
+                snapTarget.index
+            )
         end
     end
     
@@ -230,27 +221,44 @@ function ConnectionManager:handleMouseMoved(x, y, dx, dy)
 end
 
 function ConnectionManager:findConnectionPoint(block, x, y)
-    -- Check inputs
+    if not block or not block.config then return nil end
+    
+    local snapDistance = 10
+    
+    -- Check input points
     if block.config.inputs then
         for i, input in ipairs(block.config.inputs) do
             local px, py = self:getConnectionPointPosition(block, i, true)
-            local dist = math.sqrt((x - px)^2 + (y - py)^2)
-            if dist < 10 then
-                return {index = i, x = px, y = py, isInput = true, type = input.type}
+            if math.abs(x - px) < snapDistance and math.abs(y - py) < snapDistance then
+                return {
+                    x = px,
+                    y = py,
+                    index = i,
+                    isInput = true,
+                    type = input.type,
+                    block = block
+                }
             end
         end
     end
     
-    -- Check outputs
+    -- Check output points
     if block.config.outputs then
         for i, output in ipairs(block.config.outputs) do
             local px, py = self:getConnectionPointPosition(block, i, false)
-            local dist = math.sqrt((x - px)^2 + (y - py)^2)
-            if dist < 10 then
-                return {index = i, x = px, y = py, isInput = false, type = output.type}
+            if math.abs(x - px) < snapDistance and math.abs(y - py) < snapDistance then
+                return {
+                    x = px,
+                    y = py,
+                    index = i,
+                    isInput = false,
+                    type = output.type,
+                    block = block
+                }
             end
         end
     end
+    
     return nil
 end
 
@@ -272,6 +280,24 @@ function ConnectionManager:getConnectionPointPosition(block, index, isInput)
 end
 
 function ConnectionManager:createConnection(sourceBlock, targetBlock, outputIndex, inputIndex)
+    -- Validate blocks and indices
+    if not sourceBlock or not targetBlock then
+        print("Warning: Attempted to create connection with nil block")
+        return false
+    end
+    
+    if not sourceBlock.config or not sourceBlock.config.outputs or
+       not targetBlock.config or not targetBlock.config.inputs then
+        print("Warning: Invalid block configuration")
+        return false
+    end
+    
+    if not sourceBlock.config.outputs[outputIndex] or
+       not targetBlock.config.inputs[inputIndex] then
+        print("Warning: Invalid connection indices")
+        return false
+    end
+    
     -- Get connection types
     local outputType = sourceBlock.config.outputs[outputIndex].type
     local inputType = targetBlock.config.inputs[inputIndex].type
@@ -281,14 +307,18 @@ function ConnectionManager:createConnection(sourceBlock, targetBlock, outputInde
         return false
     end
     
-    -- Create connection using the Connection class
-    -- Use outputType as the connection type
-    local connection = Connection.new(sourceBlock, targetBlock, outputIndex, inputIndex, outputType)
-    
     -- Remove any existing connections to this input
     self:disconnectInput(targetBlock, inputIndex)
     
+    -- Create and store the new connection
+    local connection = Connection.new(sourceBlock, targetBlock, outputIndex, inputIndex, outputType)
     table.insert(self.connections, connection)
+    
+    -- Emit connection created event if we have events
+    if self.editor.uiManager and self.editor.uiManager.events then
+        self.editor.uiManager.events:emit("connection_created", connection)
+    end
+    
     return true
 end
 

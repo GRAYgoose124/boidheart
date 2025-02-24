@@ -107,14 +107,29 @@ function BlockManager:drawConnectionPoint(x, y, type, isInput)
     local typeInfo = self.editor.connectionManager.CONNECTION_TYPES[type] or 
                     self.editor.connectionManager.CONNECTION_TYPES.any
     
-    -- Draw connection point with type-specific styling
+    -- Draw connection point with type-specific shape
     love.graphics.setColor(unpack(typeInfo.color))
     
-    -- Draw the connection point shape
-    if isInput then
-        love.graphics.circle("fill", x, y, 4)
-    else
-        love.graphics.circle("fill", x, y, 4)
+    -- Draw the connection point based on its type's shape
+    if typeInfo.shape == "triangle" then
+        local size = typeInfo.size or 8
+        if isInput then
+            love.graphics.polygon("fill", 
+                x - size, y - size/2,
+                x, y,
+                x - size, y + size/2)
+        else
+            love.graphics.polygon("fill", 
+                x, y - size/2,
+                x + size, y,
+                x, y + size/2)
+        end
+    elseif typeInfo.shape == "circle" then
+        local radius = typeInfo.radius or 4
+        love.graphics.circle("fill", x, y, radius)
+    elseif typeInfo.shape == "square" then
+        local size = typeInfo.size or 8
+        love.graphics.rectangle("fill", x - size/2, y - size/2, size, size)
     end
     
     -- Draw outline
