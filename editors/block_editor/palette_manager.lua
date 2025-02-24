@@ -26,25 +26,26 @@ function PaletteManager:draw()
     love.graphics.rectangle("fill", 0, 0, self.paletteWidth + self.paletteX*2, love.graphics.getHeight())
     
     -- Draw blocks in palette with scrolling
-    local y = self.paletteY - self.scrollY
+    local currentY = self.paletteY - self.scrollY
+    
     for category, blocks in pairs(BLOCK_TYPES) do
         -- Draw category header
         love.graphics.setColor(1, 1, 1)
-        love.graphics.print(category, self.paletteX, y)
-        y = y + 25
+        love.graphics.print(category, self.paletteX, currentY)
+        currentY = currentY + 25
         
         -- Draw block previews
         for blockType, config in pairs(blocks) do
-            if y + self.editor.blockHeight > 0 and y < love.graphics.getHeight() then
-                self:drawBlockPreview(config, y)
+            if currentY + self.editor.blockHeight > 0 and currentY < love.graphics.getHeight() then
+                self:drawBlockPreview(config, currentY)
             end
-            y = y + self.editor.blockHeight + self.paletteSpacing
+            currentY = currentY + self.editor.blockHeight * 0.8 + self.paletteSpacing
         end
-        y = y + self.paletteSpacing * 2
+        currentY = currentY + self.paletteSpacing * 2
     end
     
     -- Update maxScrollY
-    self.maxScrollY = math.max(0, y - love.graphics.getHeight())
+    self.maxScrollY = math.max(0, currentY + self.scrollY - love.graphics.getHeight())
     
     -- Reset scissor
     love.graphics.setScissor()
@@ -83,23 +84,29 @@ end
 
 function PaletteManager:handleMousePressed(x, y, button)
     if x >= self.paletteX and x <= self.paletteX + self.paletteWidth then
-        local blockType = self:findBlockAtPosition(x, y)
-        if blockType then
-            -- Create new block instance at mouse position
+        local blockConfig = self:findBlockAtPosition(x, y)
+        if blockConfig then
+            -- Create new block instance
             local block = {
-                config = blockType,
-                x = x - self.paletteX,  -- Adjust x position relative to palette
-                y = y,
+                config = blockConfig,
+                x = x,  -- Use actual mouse position
+                y = y + self.scrollY,  -- Adjust for scroll
                 params = {}
             }
+            
             -- Initialize default parameter values
-            if blockType.params then
-                for _, param in ipairs(blockType.params) do
+            if blockConfig.params then
+                for _, param in ipairs(blockConfig.params) do
                     block.params[param.name] = param.default
                 end
             end
+            
+            -- Set up dragging with correct offset
             self.editor.blockManager.draggingBlock = block
-            self.editor.blockManager.draggingOffset = {x = self.paletteX, y = 0}
+            self.editor.blockManager.draggingOffset = {
+                x = x - block.x,
+                y = y - (block.y - self.scrollY) -- Adjust for scroll
+            }
             return true
         end
     end
@@ -117,22 +124,25 @@ function PaletteManager:handleWheelMoved(x, y)
 end
 
 function PaletteManager:findBlockAtPosition(x, y)
-    -- Adjust x position to be relative to palette
-    local relativeX = x - self.paletteX
-    if relativeX < 0 or relativeX > self.paletteWidth then
+    -- Early exit if not in palette area
+    if x < self.paletteX or x > self.paletteX + self.paletteWidth then
         return nil
     end
 
-    -- Adjust y position for scrolling
+    -- Adjust y for scroll position
     local adjustedY = y + self.scrollY
+
+    -- Track actual position while iterating
     local currentY = self.paletteY
     
     for category, blocks in pairs(BLOCK_TYPES) do
-        -- Category header height
-        currentY = currentY + 25
+        -- Category header space
+        currentY = currentY + 25 -- Height of category text
         
-        for name, config in pairs(blocks) do
+        for blockType, config in pairs(blocks) do
             local blockHeight = self.editor.blockHeight * 0.8
+            
+            -- Check if point is inside this block's bounds
             if adjustedY >= currentY and adjustedY <= currentY + blockHeight then
                 -- Create a deep copy of the config
                 local blockConfig = {}
@@ -145,8 +155,12 @@ function PaletteManager:findBlockAtPosition(x, y)
                 end
                 return blockConfig
             end
+            
+            -- Move to next block position
             currentY = currentY + blockHeight + self.paletteSpacing
         end
+        
+        -- Add spacing after category
         currentY = currentY + self.paletteSpacing * 2
     end
     return nil
