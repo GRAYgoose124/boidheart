@@ -82,34 +82,81 @@ function PaletteManager:drawBlockPreview(config, y)
 end
 
 function PaletteManager:handleMousePressed(x, y, button)
-    if x >= self.paletteX and x <= self.paletteX + self.paletteWidth then
-        local blockConfig = self:findBlockAtPosition(x, y)
-        if blockConfig then
-            -- Create new block instance
-            local block = {
-                config = blockConfig,
-                x = x,  -- Use actual mouse position
-                y = y + self.scrollY,  -- Adjust for scroll
-                params = {}
-            }
+    if button ~= 1 then return false end
+    
+    -- Check if mouse is in palette area
+    if x < self.paletteX or x > self.paletteX + self.paletteWidth then
+        return false
+    end
+
+    -- Adjust y for scroll position
+    local adjustedY = y + self.scrollY
+
+    -- Track actual position while iterating
+    local currentY = self.paletteY
+    
+    for category, blocks in pairs(BLOCK_TYPES) do
+        -- Category header space
+        currentY = currentY + 25 -- Height of category text
+        
+        for blockType, config in pairs(blocks) do
+            local blockHeight = self.editor.blockHeight * 0.8
             
-            -- Initialize default parameter values
-            if blockConfig.params then
-                for _, param in ipairs(blockConfig.params) do
-                    block.params[param.name] = param.default
+            -- Check if point is inside this block's bounds
+            if adjustedY >= currentY and adjustedY <= currentY + blockHeight then
+                -- Create new block with proper type and config
+                local block = {
+                    config = config,
+                    type = blockType,  -- Make sure to set the type!
+                    params = {},
+                    x = x,
+                    y = y
+                }
+                
+                -- Initialize default parameters
+                if config.params then
+                    for _, param in ipairs(config.params) do
+                        block.params[param.name] = param.default
+                    end
                 end
+                
+                -- Add block to editor
+                self.editor.blockManager:addBlock(block)
+                return true
             end
             
-            -- Set up dragging with correct offset
-            self.editor.blockManager.draggingBlock = block
-            self.editor.blockManager.draggingOffset = {
-                x = x - block.x,
-                y = y - (block.y - self.scrollY) -- Adjust for scroll
-            }
-            return true
+            -- Move to next block position
+            currentY = currentY + blockHeight + self.paletteSpacing
+        end
+        
+        -- Add spacing after category
+        currentY = currentY + self.paletteSpacing * 2
+    end
+    
+    return false
+end
+
+function PaletteManager:isMouseInPalette(x, y)
+    return x >= self.paletteX and x <= self.paletteX + self.editor.blockWidth * 0.8
+end
+
+function PaletteManager:createBlock(config, blockType)
+    local block = {
+        config = config,
+        type = blockType,  -- Make sure type is set
+        params = {},
+        x = love.mouse.getX(),
+        y = love.mouse.getY()
+    }
+    
+    -- Initialize default parameters
+    if config.params then
+        for _, param in ipairs(config.params) do
+            block.params[param.name] = param.default
         end
     end
-    return false
+    
+    self.editor.blockManager:addBlock(block)
 end
 
 function PaletteManager:handleWheelMoved(x, y)

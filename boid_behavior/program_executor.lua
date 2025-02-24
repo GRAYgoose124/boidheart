@@ -27,37 +27,68 @@ function ProgramExecutor.compile(program)
         outputMap = {} -- Maps block outputs to their target blocks/inputs
     }
     
-    -- Compile blocks
+    -- First pass: compile blocks and build block index mapping
+    local blockIndexMap = {} -- Maps original indices to compiled indices
+    local compiledIndex = 1
+    
     for i, blockData in ipairs(program.blocks) do
-        compiled.blocks[i] = {
+        -- Validate block data
+        if not blockData.type then
+            print(string.format("Warning: Block %d has no type", i))
+            goto continue
+        end
+        
+        -- Get executor for this block type
+        local executor = BLOCK_EXECUTORS[blockData.type]
+        if not executor then
+            print(string.format("Warning: No executor found for block type '%s'", blockData.type))
+            goto continue
+        end
+        
+        compiled.blocks[compiledIndex] = {
             type = blockData.type,
             params = blockData.params or {},
-            execute = BLOCK_EXECUTORS[blockData.type]
+            execute = executor
         }
+        
+        blockIndexMap[i] = compiledIndex
+        compiledIndex = compiledIndex + 1
+        
+        ::continue::
     end
     
-    -- Build connection maps
-    for _, conn in ipairs(program.connections) do
-        -- Map inputs to their sources
-        if not compiled.inputMap[conn.targetBlock] then
-            compiled.inputMap[conn.targetBlock] = {}
+    -- Build connection maps using the index mapping
+    for _, conn in ipairs(program.connections or {}) do
+        local sourceIndex = blockIndexMap[conn.sourceBlock]
+        local targetIndex = blockIndexMap[conn.targetBlock]
+        
+        -- Skip if either block was not compiled
+        if not sourceIndex or not targetIndex then
+            goto continue
         end
-        compiled.inputMap[conn.targetBlock][conn.inputIndex] = {
-            block = conn.sourceBlock,
+        
+        -- Map inputs to their sources
+        if not compiled.inputMap[targetIndex] then
+            compiled.inputMap[targetIndex] = {}
+        end
+        compiled.inputMap[targetIndex][conn.inputIndex] = {
+            block = sourceIndex,
             output = conn.outputIndex
         }
         
         -- Map outputs to their targets
-        if not compiled.outputMap[conn.sourceBlock] then
-            compiled.outputMap[conn.sourceBlock] = {}
+        if not compiled.outputMap[sourceIndex] then
+            compiled.outputMap[sourceIndex] = {}
         end
-        if not compiled.outputMap[conn.sourceBlock][conn.outputIndex] then
-            compiled.outputMap[conn.sourceBlock][conn.outputIndex] = {}
+        if not compiled.outputMap[sourceIndex][conn.outputIndex] then
+            compiled.outputMap[sourceIndex][conn.outputIndex] = {}
         end
-        table.insert(compiled.outputMap[conn.sourceBlock][conn.outputIndex], {
-            block = conn.targetBlock,
+        table.insert(compiled.outputMap[sourceIndex][conn.outputIndex], {
+            block = targetIndex,
             input = conn.inputIndex
         })
+        
+        ::continue::
     end
     
     return compiled
@@ -90,6 +121,12 @@ function ProgramExecutor.execute(boid, program, dt)
     local currentBlock = compiled.blocks[state.currentBlock]
     if not currentBlock then return end
     
+    -- Check if block executor exists
+    if not currentBlock.execute then
+        print(string.format("Warning: No executor found for block type '%s'", currentBlock.type))
+        return
+    end
+    
     -- Prepare inputs
     local inputs = {}
     local inputMap = compiled.inputMap[state.currentBlock]
@@ -99,8 +136,17 @@ function ProgramExecutor.execute(boid, program, dt)
         end
     end
     
-    -- Execute block
-    local outputs = currentBlock.execute(boid, inputs, currentBlock.params, dt, state.blockStates[state.currentBlock])
+    -- Initialize block state if needed
+    if not state.blockStates[state.currentBlock] then
+        state.blockStates[state.currentBlock] = {}
+    end
+    
+    -- Execute block with error handling
+    local success, outputs = pcall(currentBlock.execute, boid, inputs, currentBlock.params, dt, state.blockStates[state.currentBlock])
+    if not success then
+        print(string.format("Error executing block type '%s': %s", currentBlock.type, outputs))
+        return
+    end
     
     -- Store outputs in variables
     if outputs then

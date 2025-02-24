@@ -257,4 +257,26 @@ end
 
 function BlockManager:update(dt) end
 
+function BlockManager:addBlock(block)
+    -- Ensure block has all required fields
+    block.x = block.x or 0
+    block.y = block.y or 0
+    block.params = block.params or {}
+    
+    -- Add block to list
+    table.insert(self.blocks, block)
+    
+    -- Set as selected block
+    self.selectedBlock = block
+    
+    -- Start dragging the new block
+    self.draggingBlock = block
+    self.draggingOffset = {
+        x = 0,
+        y = 0
+    }
+    
+    return block
+end
+
 return BlockManager 

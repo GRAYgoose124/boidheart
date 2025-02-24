@@ -182,24 +182,43 @@ function BlockEditor:loadProgramData(program)
     -- Load blocks
     local blockRefs = {}
     for i, blockData in ipairs(program.blocks) do
+        -- Find the correct block config from the category
+        local blockConfig
+        for category, blocks in pairs(BLOCK_TYPES) do
+            if blocks[blockData.type] then
+                blockConfig = blocks[blockData.type]
+                break
+            end
+        end
+        
+        if not blockConfig then
+            print(string.format("Warning: No config found for block type '%s'", blockData.type))
+            goto continue
+        end
+        
         local block = {
-            config = BLOCK_TYPES[blockData.type],
+            config = blockConfig,
+            type = blockData.type,
             params = blockData.params or {},
             x = blockData.x,
             y = blockData.y
         }
         table.insert(self.blockManager.blocks, block)
         blockRefs[i] = block
+        
+        ::continue::
     end
     
     -- Load connections
     for _, conn in ipairs(program.connections) do
-        self.connectionManager:createConnection(
-            blockRefs[conn.sourceBlock],
-            blockRefs[conn.targetBlock],
-            conn.outputIndex,
-            conn.inputIndex
-        )
+        if blockRefs[conn.sourceBlock] and blockRefs[conn.targetBlock] then
+            self.connectionManager:createConnection(
+                blockRefs[conn.sourceBlock],
+                blockRefs[conn.targetBlock],
+                conn.outputIndex,
+                conn.inputIndex
+            )
+        end
     end
 end
 
@@ -223,7 +242,7 @@ function BlockEditor:createProgramTable()
     -- Copy blocks with their configurations and parameters
     for _, block in ipairs(self.blockManager.blocks) do
         table.insert(program.blocks, {
-            type = block.config.type,
+            type = block.type,
             params = table.deepcopy(block.params),
             x = block.x,
             y = block.y
