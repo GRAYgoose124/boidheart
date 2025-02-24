@@ -1,3 +1,4 @@
+local Connection = require "block_editor.connection"
 local ConnectionManager = {}
 ConnectionManager.__index = ConnectionManager
 
@@ -64,51 +65,54 @@ function ConnectionManager:drawConnections()
 end
 
 function ConnectionManager:drawConnection(connection)
-    -- Calculate connection points
-    local sourceX = connection.sourceBlock.x + self.editor.blockWidth
-    local sourceY = connection.sourceBlock.y + 
-                   (connection.outputIndex * 20) + 30
+    -- Get connection points using the helper method
+    local startX, startY, endX, endY = connection:getPoints(self)
     
-    local targetX = connection.targetBlock.x
-    local targetY = connection.targetBlock.y + 
-                   (connection.inputIndex * 20) + 30
+    -- Calculate control points for bezier curve
+    local controlX = (endX - startX) * 0.5
+    local x2 = startX + controlX
+    local x3 = endX - controlX
     
-    -- Draw connection line
-    love.graphics.setColor(0.8, 0.8, 1.0, 0.8)
-    love.graphics.setLineWidth(2)
+    -- Get connection type info with fallback to 'any'
+    local typeInfo = CONNECTION_TYPES[connection.type] or CONNECTION_TYPES.any
     
-    -- Draw bezier curve
-    local controlX1 = sourceX + 50
-    local controlX2 = targetX - 50
-    self:drawBezierConnection(
-        sourceX, sourceY,
-        controlX1, sourceY,
-        controlX2, targetY,
-        targetX, targetY
-    )
-    
-    -- Reset line width
-    love.graphics.setLineWidth(1)
+    -- Draw the connection
+    love.graphics.setColor(unpack(typeInfo.color))
+    self:drawBezierConnection(startX, startY, x2, startY, x3, endY, endX, endY)
 end
 
 function ConnectionManager:drawDraggingConnection()
     if not self.draggingConnection.source then return end
     
     local mx, my = love.mouse.getPosition()
-    local sourceX = self.draggingConnection.source.x + self.editor.blockWidth
-    local sourceY = self.draggingConnection.source.y + 
-                   (self.draggingConnection.outputIndex * 20) + 30
+    local startX, startY
+    
+    if self.draggingConnection.isInput then
+        -- If dragging from an input, start at the input point
+        startX, startY = self:getConnectionPointPosition(
+            self.draggingConnection.source, 
+            self.draggingConnection.outputIndex, 
+            true
+        )
+    else
+        -- If dragging from an output, start at the output point
+        startX, startY = self:getConnectionPointPosition(
+            self.draggingConnection.source, 
+            self.draggingConnection.outputIndex, 
+            false
+        )
+    end
     
     -- Draw preview line
     love.graphics.setColor(0.8, 0.8, 1.0, 0.5)
     love.graphics.setLineWidth(2)
     
     -- Draw bezier curve for preview
-    local controlX1 = sourceX + 50
-    local controlX2 = mx - 50
+    local controlX1 = startX + (mx - startX) * 0.5
+    local controlX2 = mx - (mx - startX) * 0.5
     self:drawBezierConnection(
-        sourceX, sourceY,
-        controlX1, sourceY,
+        startX, startY,
+        controlX1, startY,
         controlX2, my,
         mx, my
     )
@@ -120,10 +124,7 @@ function ConnectionManager:drawDraggingConnection()
     local snapTarget = self:findSnapTarget(mx, my)
     if snapTarget then
         love.graphics.setColor(0.4, 1.0, 0.4, 0.8)
-        love.graphics.circle("fill", 
-            snapTarget.x, 
-            snapTarget.y, 
-            6)
+        love.graphics.circle("fill", snapTarget.x, snapTarget.y, 6)
     end
 end
 
@@ -188,11 +189,20 @@ function ConnectionManager:handleMouseReleased(x, y, button)
     for _, block in ipairs(self.editor.blockManager.blocks) do
         local connectionPoint = self:findConnectionPoint(block, x, y)
         if connectionPoint then
-            -- Check if connection types are compatible
+            -- Get the correct source and target blocks and types
             local sourceBlock = self.draggingConnection.source
             local sourceIndex = self.draggingConnection.outputIndex
-            local sourceType = sourceBlock.config.outputs[sourceIndex].type
-            local targetType = block.config.inputs[connectionPoint.index].type
+            local sourceType, targetType
+            
+            if self.draggingConnection.isInput then
+                -- If dragging from input, swap the types
+                sourceType = block.config.outputs[connectionPoint.index].type
+                targetType = sourceBlock.config.inputs[sourceIndex].type
+            else
+                -- If dragging from output
+                sourceType = sourceBlock.config.outputs[sourceIndex].type
+                targetType = block.config.inputs[connectionPoint.index].type
+            end
             
             if self:isConnectionCompatible(sourceType, targetType) then
                 if self.draggingConnection.isInput then
@@ -203,8 +213,8 @@ function ConnectionManager:handleMouseReleased(x, y, button)
                     self:createConnection(sourceBlock, block,
                         sourceIndex, connectionPoint.index)
                 end
-                break  -- Exit loop after creating connection
             end
+            break
         end
     end
     
@@ -248,16 +258,16 @@ function ConnectionManager:getConnectionPointPosition(block, index, isInput)
     -- Guard against nil values
     if not block or not index then return 0, 0 end
     
+    local baseY = block.y + (self.editor.blockHeight * 0.4)
+    local spacing = 20
+    local yOffset = (index - 1) * spacing
+    
     if isInput then
         -- Input points go on the left side of the block
-        return block.x, 
-               block.y + (self.editor.blockHeight * 0.4) + 
-               (index - 1) * 20
+        return block.x, baseY + yOffset
     else
         -- Output points go on the right side of the block
-        return block.x + self.editor.blockWidth,
-               block.y + (self.editor.blockHeight * 0.4) + 
-               (index - 1) * 20
+        return block.x + self.editor.blockWidth, baseY + yOffset
     end
 end
 
@@ -271,14 +281,12 @@ function ConnectionManager:createConnection(sourceBlock, targetBlock, outputInde
         return false
     end
     
-    -- Create connection
-    local connection = {
-        sourceBlock = sourceBlock,
-        targetBlock = targetBlock,
-        outputIndex = outputIndex,
-        inputIndex = inputIndex,
-        type = outputType
-    }
+    -- Create connection using the Connection class
+    -- Use outputType as the connection type
+    local connection = Connection.new(sourceBlock, targetBlock, outputIndex, inputIndex, outputType)
+    
+    -- Remove any existing connections to this input
+    self:disconnectInput(targetBlock, inputIndex)
     
     table.insert(self.connections, connection)
     return true
@@ -375,7 +383,7 @@ end
 function ConnectionManager:disconnectInput(block, inputIndex)
     for i = #self.connections, 1, -1 do
         local conn = self.connections[i]
-        if conn.targetBlock == block and conn.inputIndex == inputIndex then
+        if conn.target == block and conn.inputIndex == inputIndex then
             table.remove(self.connections, i)
         end
     end

@@ -172,9 +172,13 @@ function BlockEditor:loadProgram(name)
     if not program then return end
     
     -- Clear current program
-    self.blockManager.blocks = {}
-    self.connectionManager.connections = {}
+    self:newProgram()
     
+    -- Load blocks and connections
+    self:loadProgramData(program)
+end
+
+function BlockEditor:loadProgramData(program)
     -- Load blocks
     local blockRefs = {}
     for i, blockData in ipairs(program.blocks) do
@@ -197,8 +201,6 @@ function BlockEditor:loadProgram(name)
             conn.inputIndex
         )
     end
-    
-    self.currentProgram = name
 end
 
 function BlockEditor:saveProgram(name)
@@ -249,13 +251,7 @@ function BlockEditor:applyProgramToGroup(groupId)
     if not groupId then return end
     
     local program = self:createProgramTable()
-    local boids = self.boidManager.selectionManager.groups[groupId]
-    
-    if boids then
-        for _, boid in ipairs(boids) do
-            boid.program = program
-        end
-    end
+    self.programManager:applyProgramToGroup(program, groupId, self.boidManager)
 end
 
 function BlockEditor:textinput(text)
@@ -268,12 +264,14 @@ function BlockEditor:drawDraggingConnection()
     if not self.draggingConnection.source then return end
     
     local mx, my = love.mouse.getPosition()
-    local sourceX = self.draggingConnection.source.x + self.blockWidth
-    local sourceY = self.draggingConnection.source.y + 
-                   (self.draggingConnection.outputIndex * 20)
+    local startX, startY = self.connectionManager:getConnectionPointPosition(
+        self.draggingConnection.source,
+        self.draggingConnection.outputIndex,
+        self.draggingConnection.isInput
+    )
     
     love.graphics.setColor(0.8, 0.8, 1.0, 0.5)
-    love.graphics.line(sourceX, sourceY, mx, my)
+    love.graphics.line(startX, startY, mx, my)
 end
 
 -- Return the BlockEditor object
