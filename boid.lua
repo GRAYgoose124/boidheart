@@ -1,4 +1,5 @@
 local Entity = require "entity"
+local BLOCK_TYPES = require "editors.block_editor.block_types"
 
 local Boid = setmetatable({}, {__index = Entity})
 Boid.__index = Boid
@@ -30,6 +31,9 @@ function Boid.new(x, y, leader, manager)
 end
 
 function Boid:update(dt)
+    if self.program then
+        self:executeProgram(dt)
+    end
     -- Execute behaviors with cooldown and state management
     for triggerType, behaviorData in pairs(self.behaviors or {}) do
         local state = behaviorData.state
@@ -250,6 +254,35 @@ function Boid:evaluateCondition(condition)
         return math.random() * 100 < condition.value
     end
     return false
+end
+
+function Boid:executeProgram(dt)
+    if not self.program then return end
+    
+    -- Create a map of block results
+    local blockResults = {}
+    
+    -- Execute blocks and store their results
+    for i, block in ipairs(self.program.blocks) do
+        local blockType = BLOCK_TYPES[block.type]
+        if blockType and blockType.execute then
+            blockResults[i] = blockType.execute(self, block.params, dt)
+        end
+    end
+    
+    -- Process connections
+    for _, conn in ipairs(self.program.connections) do
+        local sourceResult = blockResults[conn.sourceBlock]
+        local targetBlock = self.program.blocks[conn.targetBlock]
+        
+        -- Only execute target if source condition is met
+        if sourceResult and targetBlock then
+            local blockType = BLOCK_TYPES[targetBlock.type]
+            if blockType and blockType.execute then
+                blockType.execute(self, targetBlock.params, dt)
+            end
+        end
+    end
 end
 
 return Boid 

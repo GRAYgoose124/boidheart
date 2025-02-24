@@ -65,30 +65,31 @@ function love.resize(w, h)
 end 
 
 function love.keypressed(key)
+    local blockEditor = boidManager.blockEditor
     if key == "escape" then
-        if boidManager.blockEditor.editorVisible then
-            boidManager.blockEditor:toggle()  -- Close editor with escape
+        if blockEditor.editorVisible then
+            blockEditor:toggle()  -- Close editor with escape
             return
         end
         love.event.quit()
-    elseif boidManager.blockEditor.editorVisible then
+    elseif blockEditor.editorVisible then
         if key == "n" then
-            local name = "Program" .. (#boidManager.blockEditor.programs + 1)
-            boidManager.blockEditor:newProgram(name)
+            local name = "Program" .. (#blockEditor.programs + 1)
+            blockEditor:newProgram(name)
         elseif key == "s" then
-            boidManager.blockEditor:saveProgram()
+            blockEditor:saveProgram()
         elseif key == "l" then
             -- TODO: Add proper program selection UI
-            local firstProgram = next(boidManager.blockEditor.programs)
+            local firstProgram = next(blockEditor.programs)
             if firstProgram then
-                boidManager.blockEditor:loadProgram(firstProgram)
+                blockEditor:loadProgram(firstProgram)
             end
         elseif key == "h" then
-            boidManager.blockEditor.showHelp = not boidManager.blockEditor.showHelp
+            blockEditor.showHelp = not blockEditor.showHelp
         elseif key == "return" then
-            boidManager.blockEditor:applyToSelected(boidManager.boids)
+            blockEditor:applyToSelected(boidManager.boids)
         elseif key == "b" then
-            boidManager.blockEditor:toggle()
+            blockEditor:toggle()
         end
         return
     end
@@ -113,7 +114,7 @@ function love.keypressed(key)
         local nextGroup = boidManager.selectionManager:cycleGroupSelection(boidManager.boids)
         boidManager.waypointManager:setCurrentGroup(nextGroup)
     elseif key == "b" then
-        boidManager.blockEditor:toggle()
+        blockEditor:toggle()
     elseif key == "f" then
         boidManager:toggleShaderMode()
     end

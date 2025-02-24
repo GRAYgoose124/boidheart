@@ -20,12 +20,48 @@ function ConnectionManager:drawConnections()
     -- Draw connection being dragged
     if self.draggingConnection then
         local mx, my = love.mouse.getPosition()
+        
+        -- Find potential snap target
+        local snapTarget = nil
+        for _, block in ipairs(self.editor.blockManager.blocks) do
+            if block ~= self.draggingConnection.source then
+                local connectionPoint = self:findConnectionPoint(block, mx, my)
+                if connectionPoint and connectionPoint.isInput then
+                    -- Check type compatibility
+                    local sourceType = self.draggingConnection.source.config.outputs[self.draggingConnection.outputIndex].type
+                    local targetType = block.config.inputs[connectionPoint.index].type
+                    if self:areTypesCompatible(sourceType, targetType) then
+                        snapTarget = {
+                            block = block,
+                            point = connectionPoint,
+                            x = connectionPoint.x,
+                            y = connectionPoint.y
+                        }
+                        break
+                    end
+                end
+            end
+        end
+        
+        -- Draw the connection line
         self:drawConnection({
             source = self.draggingConnection.source,
-            target = {x = mx, y = my},
+            target = snapTarget and {
+                x = snapTarget.x,
+                y = snapTarget.y
+            } or {x = mx, y = my},
             outputIndex = self.draggingConnection.outputIndex,
-            inputIndex = 1
+            inputIndex = snapTarget and snapTarget.point.index or 1
         })
+        
+        -- Draw snap preview
+        if snapTarget then
+            love.graphics.setColor(0, 1, 0, 0.5)
+            love.graphics.circle("fill", 
+                snapTarget.x, 
+                snapTarget.y, 
+                8)
+        end
     end
 end
 
@@ -150,6 +186,7 @@ function ConnectionManager:handleMouseReleased(x, y, button)
                     self:createConnection(sourceBlock, block,
                         sourceIndex, connectionPoint.index)
                 end
+                break  -- Exit loop after creating connection
             end
         end
     end
@@ -165,16 +202,26 @@ function ConnectionManager:handleMouseMoved(x, y, dx, dy)
     return false
 end
 
-function ConnectionManager:findConnectionPoint(block, x, y, isInput)
-    -- Helper to find connection point under mouse
-    local points = isInput and block.config.inputs or block.config.outputs
-    if not points then return nil end
+function ConnectionManager:findConnectionPoint(block, x, y)
+    -- Check inputs
+    if block.config.inputs then
+        for i, input in ipairs(block.config.inputs) do
+            local px, py = self:getConnectionPointPosition(block, i, true)
+            local dist = math.sqrt((x - px)^2 + (y - py)^2)
+            if dist < 10 then
+                return {index = i, x = px, y = py, isInput = true, type = input.type}
+            end
+        end
+    end
     
-    for i, _ in ipairs(points) do
-        local px, py = self:getConnectionPointPosition(block, i, isInput)
-        local dist = math.sqrt((x - px)^2 + (y - py)^2)
-        if dist < 10 then
-            return {index = i, x = px, y = py}
+    -- Check outputs
+    if block.config.outputs then
+        for i, output in ipairs(block.config.outputs) do
+            local px, py = self:getConnectionPointPosition(block, i, false)
+            local dist = math.sqrt((x - px)^2 + (y - py)^2)
+            if dist < 10 then
+                return {index = i, x = px, y = py, isInput = false, type = output.type}
+            end
         end
     end
     return nil
@@ -215,7 +262,7 @@ end
 
 function ConnectionManager:drawConnectionPoint(x, y, type, isInput)
     local connType = CONNECTION_TYPES[type or "flow"]
-    if not connType then return end -- Skip if type not found
+    if not connType then return end
     
     love.graphics.setColor(unpack(connType.color))
     
@@ -233,7 +280,7 @@ function ConnectionManager:drawConnectionPoint(x, y, type, isInput)
                 x + size, y + size)
         end
     elseif connType.shape == "square" then
-        local size = connType.size or 8
+        local size = (connType.size or 8)
         love.graphics.rectangle("fill", 
             x - size/2, y - size/2, 
             size, size)

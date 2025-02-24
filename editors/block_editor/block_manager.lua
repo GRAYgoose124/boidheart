@@ -5,6 +5,7 @@ BlockManager.__index = BlockManager
 local BLOCK_TYPES = require "editors.block_editor.block_types"
 local CONDITION_TYPES = require "editors.block_editor.condition_types"
 local PARAMETER_TYPES = require "editors.block_editor.parameter_types"
+local UI = require "lib.ui"
 
 function BlockManager.new(editor)
     local self = setmetatable({}, BlockManager)
@@ -40,7 +41,7 @@ function BlockManager:drawBlock(block)
             block.x + self.editor.blockWidth - 20, block.y + 5)
     end
     
-    -- Draw parameters
+    -- Draw parameters first
     if block.config.params then
         local paramY = block.y + 30
         for _, param in ipairs(block.config.params) do
@@ -50,14 +51,54 @@ function BlockManager:drawBlock(block)
         end
     end
     
-    -- Draw connection points
-    self:drawConnectionPoints(block)
+    -- Draw connection points on top
+    if block.config.inputs then
+        for i, input in ipairs(block.config.inputs) do
+            local px, py = self:getConnectionPointPosition(block, i, true)
+            -- Draw input label
+            love.graphics.setColor(0.7, 0.7, 0.7)
+            love.graphics.print(input.name or "", px + 10, py - 7)
+            -- Draw connection point
+            self.editor.connectionManager:drawConnectionPoint(px, py, input.type, true)
+        end
+    end
+    
+    if block.config.outputs then
+        for i, output in ipairs(block.config.outputs) do
+            local px, py = self:getConnectionPointPosition(block, i, false)
+            -- Draw output label
+            love.graphics.setColor(0.7, 0.7, 0.7)
+            local name = output.name or ""
+            local width = love.graphics.getFont():getWidth(name)
+            love.graphics.print(name, px - width - 10, py - 7)
+            -- Draw connection point
+            self.editor.connectionManager:drawConnectionPoint(px, py, output.type, false)
+        end
+    end
 end
 
 function BlockManager:drawParameter(param, value, x, y)
     local paramType = PARAMETER_TYPES[param.type]
-    if paramType and paramType.draw then
-        paramType.draw(param, value, x, y, self.editor.blockWidth - 20)
+    if not paramType or not paramType.draw then return end
+    
+    -- Draw the parameter
+    paramType.draw(param, value, x, y, self.editor.blockWidth - 20)
+    
+    -- Handle input if needed
+    if love.mouse.isDown(1) and paramType.handleInput then
+        local newValue = paramType.handleInput(param, value, x, y, 
+            self.editor.blockWidth - 20, self.editor)
+        
+        if newValue ~= value then
+            -- Update the block parameter
+            if self.selectedBlock then
+                self.selectedBlock.params[param.name] = newValue
+                -- Trigger any block-specific update logic
+                if self.selectedBlock.onParamChanged then
+                    self.selectedBlock:onParamChanged(param.name, newValue)
+                end
+            end
+        end
     end
 end
 
@@ -83,7 +124,7 @@ end
 
 function BlockManager:getConnectionPointPosition(block, index, isInput)
     local x = block.x + (isInput and 0 or self.editor.blockWidth)
-    local y = block.y + 30 + (index - 1) * 20
+    local y = block.y + 30 + (index - 1) * 20  -- Start after block header
     return x, y
 end
 
@@ -93,29 +134,24 @@ function BlockManager:handleMousePressed(x, y, button)
         if x >= block.x and x <= block.x + self.editor.blockWidth and
            y >= block.y and y <= block.y + self.editor.blockHeight then
             
+            -- Set selected block before checking parameters
+            self.selectedBlock = block
+            
             -- Check for parameter interaction first
             if block.config.params then
                 local paramY = block.y + 30
                 for _, param in ipairs(block.config.params) do
-                    local paramType = PARAMETER_TYPES[param.type]
+                    local paramType = PARAMETER_TYPES[param.type]  -- Get the parameter type
                     if paramType and paramType.handleInput then
-                        -- Check if click is within parameter bounds
-                        local paramHeight = (param.type == "dropdown") and 20 or 10
-                        if y >= paramY and y <= paramY + paramHeight and
-                           x >= block.x + 10 and x <= block.x + self.editor.blockWidth - 10 then
-                            local newValue = paramType.handleInput(param, 
-                                block.params[param.name], 
-                                block.x + 10, paramY, 
-                                self.editor.blockWidth - 20,
-                                self.editor)
-                            if newValue ~= block.params[param.name] then
-                                block.params[param.name] = newValue
-                                return true
-                            end
-                            -- Return true even if value didn't change to prevent block dragging
-                            if param.type == "dropdown" then
-                                return true
-                            end
+                        local newValue = paramType.handleInput(param, 
+                            block.params[param.name], 
+                            block.x + 10, paramY, 
+                            self.editor.blockWidth - 20,
+                            self.editor)
+                        
+                        if newValue ~= block.params[param.name] then
+                            block.params[param.name] = newValue
+                            return true
                         end
                     end
                     paramY = paramY + 25
@@ -125,10 +161,19 @@ function BlockManager:handleMousePressed(x, y, button)
             -- Start dragging if no parameter was clicked
             self.draggingBlock = block
             self.draggingOffset = {x = x - block.x, y = y - block.y}
-            self.selectedBlock = block
             return true
         end
     end
+    
+    -- Close any open dropdowns when clicking outside
+    if self.selectedBlock and self.selectedBlock.config.params then
+        for _, param in ipairs(self.selectedBlock.config.params) do
+            if param.type == "dropdown" and param.ui then
+                param.ui.isOpen = false
+            end
+        end
+    end
+    
     self.selectedBlock = nil
     return false
 end

@@ -1,3 +1,5 @@
+local UI = require "lib.ui"
+
 local PARAMETER_TYPES = {
     slider = {
         draw = function(param, value, x, y, width)
@@ -28,53 +30,35 @@ local PARAMETER_TYPES = {
     
     dropdown = {
         draw = function(param, value, x, y, width)
-            -- Draw dropdown background
-            love.graphics.setColor(0.3, 0.3, 0.3)
-            love.graphics.rectangle("fill", x, y, width, 20)
+            -- Only use UI.Dropdown system
+            if not param.ui then
+                param.ui = UI.Dropdown.new(x, y, width, param.options, value)
+                param.ui.label = param.name
+            end
             
-            -- Draw current value and label
-            love.graphics.setColor(1, 1, 1)
-            love.graphics.print(param.name .. ": " .. tostring(value), x + 5, y + 2)
+            -- Update position and value
+            param.ui.x = x
+            param.ui.y = y
+            param.ui.currentValue = value
             
-            -- Draw dropdown arrow
-            love.graphics.setColor(0.8, 0.8, 0.8)
-            love.graphics.polygon("fill",
-                x + width - 15, y + 5,
-                x + width - 5, y + 5,
-                x + width - 10, y + 15)
+            param.ui:draw()
         end,
         
         handleInput = function(param, value, x, y, width, editor)
             local mx, my = love.mouse.getPosition()
             
-            -- Toggle dropdown on click
-            if my >= y and my <= y + 20 and mx >= x and mx <= x + width then
-                if love.mouse.isDown(1) and not param.clicked then
-                    param.clicked = true
-                    -- Toggle dropdown
-                    if editor.uiManager.activeDropdown and editor.uiManager.activeDropdown.param == param then
-                        editor.uiManager.activeDropdown = nil
-                    else
-                        editor.uiManager.activeDropdown = {
-                            x = x,
-                            y = y + 20,
-                            width = width,
-                            options = param.options,
-                            currentValue = value,
-                            param = param
-                        }
+            if not param.ui then return value end
+            
+            if param.ui:handleClick(mx, my) then
+                -- Update block parameter when dropdown value changes
+                if editor.blockManager.selectedBlock then
+                    editor.blockManager.selectedBlock.params[param.name] = param.ui.currentValue
+                    -- Trigger any block-specific update logic
+                    if editor.blockManager.selectedBlock.onParamChanged then
+                        editor.blockManager.selectedBlock:onParamChanged(param.name, param.ui.currentValue)
                     end
                 end
-            elseif editor.uiManager.activeDropdown and editor.uiManager.activeDropdown.param == param then
-                -- Handle dropdown selection
-                local handled, newValue = editor.uiManager:handleMousePressed(mx, my, 1)
-                if handled and newValue then
-                    return newValue
-                end
-            end
-            
-            if not love.mouse.isDown(1) then
-                param.clicked = false
+                return param.ui.currentValue
             end
             
             return value

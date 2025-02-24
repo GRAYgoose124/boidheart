@@ -1,11 +1,19 @@
 local UIManager = {}
 UIManager.__index = UIManager
 
+local UI = require "lib.ui"
+
 function UIManager.new(editor)
     local self = setmetatable({}, UIManager)
     self.editor = editor
     self.activeDropdown = nil
     self.activeDialog = nil
+    self.showProgramMenu = false
+    self.programMenuX = love.graphics.getWidth() - 200
+    self.programMenuY = 10
+    self.programMenuWidth = 180
+    self.buttonHeight = 30
+    self.buttonSpacing = 5
     return self
 end
 
@@ -16,6 +24,11 @@ function UIManager:drawBackground()
 end
 
 function UIManager:drawOverlay()
+    -- Draw program management menu
+    if self.editor.editorVisible then
+        self:drawProgramMenu()
+    end
+
     -- Draw active dropdown if any
     if self.activeDropdown then
         self:drawDropdownMenu(self.activeDropdown)
@@ -67,28 +80,135 @@ function UIManager:drawDropdownMenu(dropdown)
     end
 end
 
+function UIManager:drawProgramMenu()
+    -- Draw menu background
+    love.graphics.setColor(0.2, 0.2, 0.2, 0.9)
+    love.graphics.rectangle("fill", 
+        self.programMenuX, 
+        self.programMenuY, 
+        self.programMenuWidth, 
+        self.buttonHeight * 5 + self.buttonSpacing * 4)
+
+    -- Create and draw buttons
+    local y = self.programMenuY
+    local buttons = {
+        UI.Button.new(
+            self.programMenuX + 5,
+            y + 2,
+            self.programMenuWidth - 10,
+            self.buttonHeight - 4,
+            "Load Program",
+            function() self:handleProgramAction("load") end
+        ),
+        UI.Button.new(
+            self.programMenuX + 5,
+            y + 2 + self.buttonHeight + self.buttonSpacing,
+            self.programMenuWidth - 10,
+            self.buttonHeight - 4,
+            "Save Program",
+            function() self:handleProgramAction("save") end
+        ),
+        UI.Button.new(
+            self.programMenuX + 5,
+            y + 2 + 2 * (self.buttonHeight + self.buttonSpacing),
+            self.programMenuWidth - 10,
+            self.buttonHeight - 4,
+            "Apply to Group",
+            function() self:handleProgramAction("apply") end
+        ),
+        UI.Button.new(
+            self.programMenuX + 5,
+            y + 2 + 3 * (self.buttonHeight + self.buttonSpacing),
+            self.programMenuWidth - 10,
+            self.buttonHeight - 4,
+            "Clear Program",
+            function() self:handleProgramAction("clear") end
+        ),
+        UI.Button.new(
+            self.programMenuX + 5,
+            y + 2 + 4 * (self.buttonHeight + self.buttonSpacing),
+            self.programMenuWidth - 10,
+            self.buttonHeight - 4,
+            "Run Program",
+            function() self:handleProgramAction("run") end
+        )
+    }
+    
+    for _, button in ipairs(buttons) do
+        button:draw()
+        y = y + self.buttonHeight + self.buttonSpacing
+    end
+end
+
+function UIManager:isMouseOverButton(button, y)
+    local mx, my = love.mouse.getPosition()
+    return mx >= self.programMenuX + 5 and
+           mx <= self.programMenuX + self.programMenuWidth - 5 and
+           my >= y + 2 and
+           my <= y + self.buttonHeight - 2
+end
+
 function UIManager:handleMousePressed(x, y, button)
     if button ~= 1 then return false end
     
-    -- Handle dropdown selection
-    if self.activeDropdown then
-        local dropdown = self.activeDropdown
+    -- Check program menu buttons
+    if self.editor.editorVisible then
+        local y = self.programMenuY
+        local buttons = {
+            UI.Button.new(
+                self.programMenuX + 5,
+                y + 2,
+                self.programMenuWidth - 10,
+                self.buttonHeight - 4,
+                "Load Program",
+                function() self:handleProgramAction("load") end
+            ),
+            UI.Button.new(
+                self.programMenuX + 5,
+                y + 2 + self.buttonHeight + self.buttonSpacing,
+                self.programMenuWidth - 10,
+                self.buttonHeight - 4,
+                "Save Program",
+                function() self:handleProgramAction("save") end
+            ),
+            UI.Button.new(
+                self.programMenuX + 5,
+                y + 2 + 2 * (self.buttonHeight + self.buttonSpacing),
+                self.programMenuWidth - 10,
+                self.buttonHeight - 4,
+                "Apply to Group",
+                function() self:handleProgramAction("apply") end
+            ),
+            UI.Button.new(
+                self.programMenuX + 5,
+                y + 2 + 3 * (self.buttonHeight + self.buttonSpacing),
+                self.programMenuWidth - 10,
+                self.buttonHeight - 4,
+                "Clear Program",
+                function() self:handleProgramAction("clear") end
+            ),
+            UI.Button.new(
+                self.programMenuX + 5,
+                y + 2 + 4 * (self.buttonHeight + self.buttonSpacing),
+                self.programMenuWidth - 10,
+                self.buttonHeight - 4,
+                "Run Program",
+                function() self:handleProgramAction("run") end
+            )
+        }
         
-        -- Check if click is on an option
-        if x >= dropdown.x and x <= dropdown.x + dropdown.width then
-            local optionY = dropdown.y
-            for i, option in ipairs(dropdown.options) do
-                if y >= optionY and y <= optionY + 20 then
-                    self.activeDropdown = nil
-                    return true, option
-                end
-                optionY = optionY + 20
+        for _, btn in ipairs(buttons) do
+            if btn:isHovered(x, y) then
+                btn.action()
+                return true
             end
+            y = y + self.buttonHeight + self.buttonSpacing
         end
-        
-        -- Click outside dropdown closes it
-        self.activeDropdown = nil
-        return true
+    end
+
+    -- Handle active dropdown
+    if self.activeDropdown then
+        return self.activeDropdown:handleClick(x, y)
     end
     
     return false
@@ -121,7 +241,7 @@ function UIManager:drawHelp()
     local y = 160
     local helpText = {
         "Controls:",
-        "- Tab: Toggle editor visibility",
+        "- B: Toggle editor visibility",
         "- Left Click: Select/drag blocks",
         "- Left Click + Drag: Create connections",
         "- Delete: Remove selected block",
@@ -156,6 +276,67 @@ end
 
 function UIManager:update(dt)
     -- Add any necessary update logic
+end
+
+function UIManager:handleProgramAction(action)
+    if action == "load" then
+        -- Show program selection dialog
+        local files = love.filesystem.getDirectoryItems("programs")
+        local programs = {}
+        for _, file in ipairs(files) do
+            if file:match("%.lua$") then
+                table.insert(programs, file:gsub("%.lua$", ""))
+            end
+        end
+        
+        if #programs > 0 then
+            -- For now, just load the first program
+            -- TODO: Add proper program selection UI
+            self.editor:loadProgram(programs[1])
+        end
+        
+    elseif action == "save" then
+        local name = self.editor.currentProgram or "program_" .. os.time()
+        self.editor:saveProgram(name)
+        
+    elseif action == "apply" then
+        -- Get selected boids and apply program
+        local selectedBoids = self.editor.boidManager.selectionManager:getSelectedBoids()
+        if #selectedBoids > 0 then
+            local groupId = selectedBoids[1].groupId
+            if groupId then
+                self.editor:applyProgramToGroup(groupId)
+            end
+        end
+        
+    elseif action == "clear" then
+        self.editor:newProgram()
+        
+    elseif action == "run" then
+        -- Run is the same as apply for now
+        local selectedBoids = self.editor.boidManager.selectionManager:getSelectedBoids()
+        if #selectedBoids > 0 then
+            local groupId = selectedBoids[1].groupId
+            if groupId then
+                self.editor:applyProgramToGroup(groupId)
+            end
+        end
+    end
+end
+
+function UIManager:serializeTable(tbl)
+    local result = "{"
+    for k, v in pairs(tbl) do
+        local key = type(k) == "number" and k or string.format("[%q]", k)
+        if type(v) == "table" then
+            result = result .. string.format("%s=%s,", key, self:serializeTable(v))
+        elseif type(v) == "string" then
+            result = result .. string.format("%s=%q,", key, v)
+        else
+            result = result .. string.format("%s=%s,", key, tostring(v))
+        end
+    end
+    return result .. "}"
 end
 
 return UIManager 

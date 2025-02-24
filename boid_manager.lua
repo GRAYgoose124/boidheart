@@ -16,7 +16,7 @@ function BoidManager.new(maxBoids)
     self.shaderManager = ShaderManager.new(maxBoids)
     self.selectionManager = SelectionManager.new(self)
     self.waypointManager = WaypointManager.new()
-    self.blockEditor = BlockEditor.new()
+    self.blockEditor = BlockEditor.new(self)
     
     return self
 end
