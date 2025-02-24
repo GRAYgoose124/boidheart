@@ -115,11 +115,7 @@ function love.keypressed(key)
             end
         end
     elseif key == "tab" then
-        boidManager.waypointManager.currentGroupId = boidManager.waypointManager.currentGroupId + 1
-        if boidManager.waypointManager.currentGroupId > #boidManager.waypointManager.paths then
-            boidManager.waypointManager.currentGroupId = 1
-        end
-        boidManager:cycleGroupSelection(boidManager.waypointManager.currentGroupId)
+        boidManager.blockEditor:toggle()
     elseif key == "b" then
         boidManager.blockEditor:toggle()
     elseif key == "f" then

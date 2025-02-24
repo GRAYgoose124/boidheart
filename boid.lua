@@ -30,8 +30,23 @@ function Boid.new(x, y, leader, manager)
 end
 
 function Boid:update(dt)
-    -- Execute behaviors first
-    for triggerType, actions in pairs(self.behaviors or {}) do
+    -- Execute behaviors with cooldown and state management
+    for triggerType, behaviorData in pairs(self.behaviors or {}) do
+        local state = behaviorData.state
+        local actions = behaviorData.actions
+        
+        -- Skip if waiting
+        if state.waitUntil > state.currentTime then
+            state.currentTime = state.currentTime + dt
+            goto continue
+        end
+        
+        -- Check cooldowns
+        if state.cooldown > 0 then
+            state.cooldown = state.cooldown - dt
+            goto continue
+        end
+        
         local shouldExecute = false
         
         if triggerType == "ALWAYS" then
@@ -55,11 +70,32 @@ function Boid:update(dt)
             shouldExecute = distSq < (targetDist * targetDist)
         end
         
-        if shouldExecute then
+        if shouldExecute and state.active then
             for _, action in ipairs(actions) do
-                self:executeAction(action)
+                if action.type == "RANDOM" then
+                    -- Handle random path selection
+                    local weights = action.params.weights or "1,1,1"
+                    state.currentPath = "RANDOM:" .. weights
+                elseif action.type == "BRANCH" then
+                    -- Existing branch handling
+                    state.currentPath = self.boidManager.blockEditor:evaluateCondition(action.params.condition, self)
+                elseif action.type == "WAIT" then
+                    state.waitUntil = state.currentTime + (action.params.duration or 1.0)
+                    break
+                elseif action.type == "TOGGLE_BEHAVIOR" then
+                    local targetState = self.behaviors[action.params.behavior]
+                    if targetState then
+                        targetState.state.active = action.params.enabled
+                    end
+                else
+                    self:executeAction(action)
+                end
             end
+            
+            state.cooldown = action.cooldown or 0
         end
+        
+        ::continue::
     end
 
     local targetX, targetY
@@ -181,6 +217,37 @@ function Boid:executeAction(action)
     elseif action.type == "SET_SPEED" then
         self.maxSpeed = action.params.speed or 150
     end
+end
+
+function Boid:evaluateCondition(condition)
+    if type(condition) ~= "table" then return false end
+    
+    if condition.type == "DISTANCE" then
+        local target
+        if condition.target == "player" then
+            target = self.boidManager.player
+        elseif condition.target == "waypoint" then
+            target = self.boidManager.waypointManager:getNextWaypoint(self.groupId, self.x, self.y)
+        elseif condition.target == "nearest_boid" then
+            target = self:findNearestBoid()
+        end
+        
+        if target then
+            local dist = math.sqrt((target.x - self.x)^2 + (target.y - self.y)^2)
+            return self:compareValue(dist, condition.op, tonumber(condition.value) or 100)
+        end
+    elseif condition.type == "SPEED" then
+        local speed = math.sqrt(self.vx^2 + self.vy^2)
+        return self:compareValue(speed, condition.op, condition.value)
+        
+    elseif condition.type == "STATE" then
+        local state = self:getState(condition.options)
+        return self:compareValue(state, condition.op, condition.value)
+        
+    elseif condition.type == "RANDOM" then
+        return math.random() * 100 < condition.value
+    end
+    return false
 end
 
 return Boid 

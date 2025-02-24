@@ -2,7 +2,7 @@ local BoidManager = {}
 BoidManager.__index = BoidManager
 
 -- Add to the top of the file after other requires
-local BlockEditor = require "block_editor"
+local BlockEditor = require "editors.block_editor"
 
 function BoidManager.new(maxBoids)
     local self = setmetatable({}, BoidManager)
@@ -31,7 +31,7 @@ function BoidManager.new(maxBoids)
     -- Send initial resolution to shaders
     local w, h = love.graphics.getDimensions()
     self.fieldShader:send("resolution", {w, h})
-    self.trailShader:send("resolution", {w, h})
+    -- self.trailShader:send("resolution", {w, h})
     
     self.waypointManager = require("waypoint_manager").new()
     self.selectionRadius = 100
@@ -69,8 +69,12 @@ function BoidManager:update(dt)
     end
     
     -- Send combined data to shader
-    self.fieldShader:send("boidData", unpack(boidData))
-    self.fieldShader:send("boidCount", #self.boids)
+    if self.shaderMode == "field" then
+        self.fieldShader:send("boidData", unpack(boidData))
+        self.fieldShader:send("boidCount", #self.boids)
+    elseif self.shaderMode == "trail" then
+        -- self.trailShader:send("time", love.timer.getTime())
+    end
 end
 
 function BoidManager:draw()
