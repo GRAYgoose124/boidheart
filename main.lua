@@ -61,13 +61,7 @@ end
 
 function love.resize(w, h)
     if boidManager then
-        boidManager.fieldShader:send("resolution", {w, h})
-        boidManager.trailShader:send("resolution", {w, h})
-        boidManager.canvas = love.graphics.newCanvas()
-        boidManager.trailCanvas = {
-            love.graphics.newCanvas(),
-            love.graphics.newCanvas()
-        }
+        boidManager.shaderManager:resize(w, h)
     end
 end 
 
