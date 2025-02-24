@@ -2,9 +2,9 @@ local BlockManager = {}
 BlockManager.__index = BlockManager
 
 -- Import block types and conditions
-local BLOCK_TYPES = require "editors.block_editor.block_types"
-local CONDITION_TYPES = require "editors.block_editor.condition_types"
-local PARAMETER_TYPES = require "editors.block_editor.parameter_types"
+local BLOCK_TYPES = require "block_editor.block_types"
+local CONDITION_TYPES = require "block_editor.condition_types"
+local PARAMETER_TYPES = require "block_editor.parameter_types"
 local UI = require "lib.ui"
 
 function BlockManager.new(editor)
@@ -123,9 +123,19 @@ function BlockManager:drawConnectionPoints(block)
 end
 
 function BlockManager:getConnectionPointPosition(block, index, isInput)
-    local x = block.x + (isInput and 0 or self.editor.blockWidth)
-    local y = block.y + 30 + (index - 1) * 20  -- Start after block header
-    return x, y
+    if not block then return 0, 0 end -- Guard against nil block
+    
+    if isInput then
+        -- Input points go on the left side of the block
+        return block.x,
+               block.y + (self.editor.blockHeight * 0.4) + 
+               (index - 1) * 20
+    else
+        -- Output points go on the right side of the block
+        return block.x + self.editor.blockWidth,
+               block.y + (self.editor.blockHeight * 0.4) + 
+               (index - 1) * 20
+    end
 end
 
 function BlockManager:handleMousePressed(x, y, button)

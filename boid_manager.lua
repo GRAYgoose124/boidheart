@@ -2,7 +2,7 @@ local BoidManager = {}
 BoidManager.__index = BoidManager
 
 -- Add to the top of the file after other requires
-local BlockEditor = require "editors.block_editor"
+local BlockEditor = require "block_editor"
 local ShaderManager = require "shader_manager"
 local SelectionManager = require "selection_manager"
 local WaypointManager = require "waypoint_manager"
@@ -34,6 +34,7 @@ function BoidManager:update(dt)
         boid:update(dt)
     end
     
+    self.blockEditor:update(dt)
     self.shaderManager:update(self.boids)
 end
 

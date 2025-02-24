@@ -2,10 +2,12 @@
 local BlockEditor = {}
 BlockEditor.__index = BlockEditor
 
-local ConnectionManager = require "editors.block_editor.connection_manager"
-local PaletteManager = require "editors.block_editor.palette_manager"
-local BlockManager = require "editors.block_editor.block_manager"
-local UIManager = require "editors.block_editor.ui_manager"
+local BLOCK_TYPES = require "block_editor.block_types"
+
+local ConnectionManager = require "block_editor.connection_manager"
+local PaletteManager = require "block_editor.palette_manager"
+local BlockManager = require "block_editor.block_manager"
+local UIManager = require "block_editor.ui_manager"
 
 function BlockEditor.new(boidManager)
     local self = setmetatable({}, BlockEditor)
@@ -169,8 +171,6 @@ function BlockEditor:drawGrid()
         love.graphics.line(self.workspaceX, y, width, y)
     end
 end
-
--- Add these methods to the BlockEditor class
 
 function BlockEditor:update(dt)
     if not self.editorVisible then return end

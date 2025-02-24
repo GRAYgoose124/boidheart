@@ -1,5 +1,5 @@
 local Entity = require "entity"
-local BLOCK_TYPES = require "editors.block_editor.block_types"
+local BLOCK_TYPES = require "block_editor.block_types"
 
 local Boid = setmetatable({}, {__index = Entity})
 Boid.__index = Boid

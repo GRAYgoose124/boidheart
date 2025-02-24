@@ -14,6 +14,50 @@ function UIManager.new(editor)
     self.programMenuWidth = 180
     self.buttonHeight = 30
     self.buttonSpacing = 5
+    
+    -- Create program menu buttons once
+    self.programButtons = {
+        UI.Button.new(
+            self.programMenuX + 5,
+            self.programMenuY + 2,
+            self.programMenuWidth - 10,
+            self.buttonHeight - 4,
+            "Load Program",
+            function() self:handleProgramAction("load") end
+        ),
+        UI.Button.new(
+            self.programMenuX + 5,
+            self.programMenuY + 2 + self.buttonHeight + self.buttonSpacing,
+            self.programMenuWidth - 10,
+            self.buttonHeight - 4,
+            "Save Program",
+            function() self:handleProgramAction("save") end
+        ),
+        UI.Button.new(
+            self.programMenuX + 5,
+            self.programMenuY + 2 + 2 * (self.buttonHeight + self.buttonSpacing),
+            self.programMenuWidth - 10,
+            self.buttonHeight - 4,
+            "Apply to Group",
+            function() self:handleProgramAction("apply") end
+        ),
+        UI.Button.new(
+            self.programMenuX + 5,
+            self.programMenuY + 2 + 3 * (self.buttonHeight + self.buttonSpacing),
+            self.programMenuWidth - 10,
+            self.buttonHeight - 4,
+            "Clear Program",
+            function() self:handleProgramAction("clear") end
+        ),
+        UI.Button.new(
+            self.programMenuX + 5,
+            self.programMenuY + 2 + 4 * (self.buttonHeight + self.buttonSpacing),
+            self.programMenuWidth - 10,
+            self.buttonHeight - 4,
+            "Run Program",
+            function() self:handleProgramAction("run") end
+        )
+    }
     return self
 end
 
@@ -89,54 +133,9 @@ function UIManager:drawProgramMenu()
         self.programMenuWidth, 
         self.buttonHeight * 5 + self.buttonSpacing * 4)
 
-    -- Create and draw buttons
-    local y = self.programMenuY
-    local buttons = {
-        UI.Button.new(
-            self.programMenuX + 5,
-            y + 2,
-            self.programMenuWidth - 10,
-            self.buttonHeight - 4,
-            "Load Program",
-            function() self:handleProgramAction("load") end
-        ),
-        UI.Button.new(
-            self.programMenuX + 5,
-            y + 2 + self.buttonHeight + self.buttonSpacing,
-            self.programMenuWidth - 10,
-            self.buttonHeight - 4,
-            "Save Program",
-            function() self:handleProgramAction("save") end
-        ),
-        UI.Button.new(
-            self.programMenuX + 5,
-            y + 2 + 2 * (self.buttonHeight + self.buttonSpacing),
-            self.programMenuWidth - 10,
-            self.buttonHeight - 4,
-            "Apply to Group",
-            function() self:handleProgramAction("apply") end
-        ),
-        UI.Button.new(
-            self.programMenuX + 5,
-            y + 2 + 3 * (self.buttonHeight + self.buttonSpacing),
-            self.programMenuWidth - 10,
-            self.buttonHeight - 4,
-            "Clear Program",
-            function() self:handleProgramAction("clear") end
-        ),
-        UI.Button.new(
-            self.programMenuX + 5,
-            y + 2 + 4 * (self.buttonHeight + self.buttonSpacing),
-            self.programMenuWidth - 10,
-            self.buttonHeight - 4,
-            "Run Program",
-            function() self:handleProgramAction("run") end
-        )
-    }
-    
-    for _, button in ipairs(buttons) do
+    -- Draw the buttons
+    for _, button in ipairs(self.programButtons) do
         button:draw()
-        y = y + self.buttonHeight + self.buttonSpacing
     end
 end
 
@@ -153,59 +152,15 @@ function UIManager:handleMousePressed(x, y, button)
     
     -- Check program menu buttons
     if self.editor.editorVisible then
-        local y = self.programMenuY
-        local buttons = {
-            UI.Button.new(
-                self.programMenuX + 5,
-                y + 2,
-                self.programMenuWidth - 10,
-                self.buttonHeight - 4,
-                "Load Program",
-                function() self:handleProgramAction("load") end
-            ),
-            UI.Button.new(
-                self.programMenuX + 5,
-                y + 2 + self.buttonHeight + self.buttonSpacing,
-                self.programMenuWidth - 10,
-                self.buttonHeight - 4,
-                "Save Program",
-                function() self:handleProgramAction("save") end
-            ),
-            UI.Button.new(
-                self.programMenuX + 5,
-                y + 2 + 2 * (self.buttonHeight + self.buttonSpacing),
-                self.programMenuWidth - 10,
-                self.buttonHeight - 4,
-                "Apply to Group",
-                function() self:handleProgramAction("apply") end
-            ),
-            UI.Button.new(
-                self.programMenuX + 5,
-                y + 2 + 3 * (self.buttonHeight + self.buttonSpacing),
-                self.programMenuWidth - 10,
-                self.buttonHeight - 4,
-                "Clear Program",
-                function() self:handleProgramAction("clear") end
-            ),
-            UI.Button.new(
-                self.programMenuX + 5,
-                y + 2 + 4 * (self.buttonHeight + self.buttonSpacing),
-                self.programMenuWidth - 10,
-                self.buttonHeight - 4,
-                "Run Program",
-                function() self:handleProgramAction("run") end
-            )
-        }
-        
-        for _, btn in ipairs(buttons) do
-            if btn:isHovered(x, y) then
+        local mx, my = love.mouse.getPosition()
+        for _, btn in ipairs(self.programButtons) do
+            if btn:isHovered(mx, my) then
                 btn.action()
                 return true
             end
-            y = y + self.buttonHeight + self.buttonSpacing
         end
     end
-
+    
     -- Handle active dropdown
     if self.activeDropdown then
         return self.activeDropdown:handleClick(x, y)
@@ -296,24 +251,14 @@ function UIManager:handleProgramAction(action)
         end
         
     elseif action == "save" then
-        local name = self.editor.currentProgram or "program_" .. os.time()
+        local name = (self.editor.currentProgram or "program_") .. os.time()
         self.editor:saveProgram(name)
-        
-    elseif action == "apply" then
-        -- Get selected boids and apply program
-        local selectedBoids = self.editor.boidManager.selectionManager:getSelectedBoids()
-        if #selectedBoids > 0 then
-            local groupId = selectedBoids[1].groupId
-            if groupId then
-                self.editor:applyProgramToGroup(groupId)
-            end
-        end
         
     elseif action == "clear" then
         self.editor:newProgram()
         
-    elseif action == "run" then
-        -- Run is the same as apply for now
+    elseif action == "apply" or action == "run" then
+        -- Get selected boids and apply program
         local selectedBoids = self.editor.boidManager.selectionManager:getSelectedBoids()
         if #selectedBoids > 0 then
             local groupId = selectedBoids[1].groupId

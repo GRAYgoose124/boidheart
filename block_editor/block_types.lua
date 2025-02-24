@@ -1,4 +1,4 @@
-local CONDITION_TYPES = require "editors.block_editor.condition_types"
+local CONDITION_TYPES = require "block_editor.condition_types"
 
 local BLOCK_TYPES = {
     Triggers = {
