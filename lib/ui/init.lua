@@ -1,4 +1,6 @@
 local UI = {}
+local Dialogs = require "lib.ui.dialogs"
+local Menus = require "lib.ui.menus"
 
 -- Button class
 local Button = {}
@@ -146,5 +148,7 @@ end
 -- Add classes to UI library
 UI.Button = Button
 UI.Dropdown = Dropdown
+UI.Dialogs = Dialogs
+UI.Menus = Menus
 
 return UI 

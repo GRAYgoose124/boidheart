@@ -2,7 +2,6 @@ local PaletteManager = {}
 PaletteManager.__index = PaletteManager
 
 local BLOCK_TYPES = require "block_editor.block_types"
-local CONNECTION_TYPES = require "block_editor.connection_types"
 
 function PaletteManager.new(editor)
     local self = setmetatable({}, PaletteManager)

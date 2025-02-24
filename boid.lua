@@ -1,5 +1,6 @@
 local Entity = require "entity"
 local BLOCK_TYPES = require "block_editor.block_types"
+local ProgramExecutor = require "boid_behavior.program_executor"
 
 local Boid = setmetatable({}, {__index = Entity})
 Boid.__index = Boid
@@ -257,32 +258,14 @@ function Boid:evaluateCondition(condition)
 end
 
 function Boid:executeProgram(dt)
-    if not self.program then return end
-    
-    -- Create a map of block results
-    local blockResults = {}
-    
-    -- Execute blocks and store their results
-    for i, block in ipairs(self.program.blocks) do
-        local blockType = BLOCK_TYPES[block.type]
-        if blockType and blockType.execute then
-            blockResults[i] = blockType.execute(self, block.params, dt)
-        end
+    if self.program then
+        ProgramExecutor.execute(self, self.program, dt)
     end
-    
-    -- Process connections
-    for _, conn in ipairs(self.program.connections) do
-        local sourceResult = blockResults[conn.sourceBlock]
-        local targetBlock = self.program.blocks[conn.targetBlock]
-        
-        -- Only execute target if source condition is met
-        if sourceResult and targetBlock then
-            local blockType = BLOCK_TYPES[targetBlock.type]
-            if blockType and blockType.execute then
-                blockType.execute(self, targetBlock.params, dt)
-            end
-        end
-    end
+end
+
+function Boid:destroy()
+    ProgramExecutor.cleanup(self)
+    -- ... any other cleanup code ...
 end
 
 return Boid 

@@ -43,146 +43,113 @@ function ConnectionManager.new(editor)
     return self
 end
 
+function ConnectionManager:draw()
+    -- Draw background grid
+    self.editor:drawGrid()
+    
+    -- Draw all connections
+    self:drawConnections()
+    
+    -- Draw connection being dragged
+    if self.draggingConnection then
+        self:drawDraggingConnection()
+    end
+end
+
 function ConnectionManager:drawConnections()
     -- Draw existing connections
     for _, connection in ipairs(self.connections) do
         self:drawConnection(connection)
     end
-    
-    -- Draw connection being dragged
-    if self.draggingConnection then
-        local mx, my = love.mouse.getPosition()
-        
-        -- Find potential snap target
-        local snapTarget = nil
-        for _, block in ipairs(self.editor.blockManager.blocks) do
-            if block ~= self.draggingConnection.source then
-                local connectionPoint = self:findConnectionPoint(block, mx, my)
-                if connectionPoint then
-                    -- Check if we're dragging from input to output or vice versa
-                    local isValidConnection = self.draggingConnection.isInput and 
-                        (not connectionPoint.isInput) or
-                        (not self.draggingConnection.isInput and connectionPoint.isInput)
-                    
-                    if isValidConnection then
-                        -- Check type compatibility
-                        local sourceType = self.draggingConnection.isInput and
-                            block.config.outputs[connectionPoint.index].type or
-                            self.draggingConnection.source.config.outputs[self.draggingConnection.outputIndex].type
-                        local targetType = self.draggingConnection.isInput and
-                            self.draggingConnection.source.config.inputs[self.draggingConnection.outputIndex].type or
-                            block.config.inputs[connectionPoint.index].type
-                            
-                        if self:isConnectionCompatible(sourceType, targetType) then
-                            snapTarget = {
-                                block = block,
-                                point = connectionPoint,
-                                x = connectionPoint.x,
-                                y = connectionPoint.y
-                            }
-                            break
-                        end
-                    end
-                end
-            end
-        end
-        
-        -- Draw the connection line
-        local sourceX, sourceY, targetX, targetY
-        if self.draggingConnection.isInput then
-            -- Dragging from input to output
-            targetX, targetY = snapTarget and snapTarget.x or mx, snapTarget and snapTarget.y or my
-            sourceX, sourceY = self:getConnectionPointPosition(
-                self.draggingConnection.source, 
-                self.draggingConnection.outputIndex, 
-                true)
-        else
-            -- Dragging from output to input
-            sourceX, sourceY = self:getConnectionPointPosition(
-                self.draggingConnection.source, 
-                self.draggingConnection.outputIndex, 
-                false)
-            targetX, targetY = snapTarget and snapTarget.x or mx, snapTarget and snapTarget.y or my
-        end
-        
-        -- Draw the connection line
-        local typeInfo = CONNECTION_TYPES[self.draggingConnection.type] or CONNECTION_TYPES.any
-        love.graphics.setColor(unpack(typeInfo.color))
-        self:drawBezierConnection(sourceX, sourceY, targetX, targetY)
-        
-        -- Draw snap preview
-        if snapTarget then
-            love.graphics.setColor(0, 1, 0, 0.5)
-            love.graphics.circle("fill", snapTarget.x, snapTarget.y, 8)
-        end
-    end
 end
 
-function ConnectionManager:drawConnectionPoints(block)
-    -- Draw input points
-    if block.config.inputs then
-        for i, input in ipairs(block.config.inputs) do
-            local x, y = self:getConnectionPointPosition(block, i, true)
-            self:drawConnectionPoint(x, y, input.type or "flow", true)
-        end
-    end
+function ConnectionManager:drawConnection(connection)
+    -- Calculate connection points
+    local sourceX = connection.sourceBlock.x + self.editor.blockWidth
+    local sourceY = connection.sourceBlock.y + 
+                   (connection.outputIndex * 20) + 30
     
-    -- Draw output points
-    if block.config.outputs then
-        for i, output in ipairs(block.config.outputs) do
-            local x, y = self:getConnectionPointPosition(block, i, false)
-            self:drawConnectionPoint(x, y, output.type or "flow", false)
-        end
-    end
-end
-
-function ConnectionManager:drawConnection(conn)
-    -- Early return if connection is invalid
-    if not conn or not conn.sourceBlock or not conn.targetBlock then return end
+    local targetX = connection.targetBlock.x
+    local targetY = connection.targetBlock.y + 
+                   (connection.inputIndex * 20) + 30
     
-    -- Get source position
-    local sourceX, sourceY = self:getConnectionPointPosition(
-        conn.sourceBlock, conn.outputIndex, false)
-    
-    -- Get target position (might be mouse position for dragging)
-    local targetX, targetY
-    if type(conn.target) == "table" and conn.target.x and conn.target.y then
-        -- Use direct coordinates for dragging
-        targetX, targetY = conn.target.x, conn.target.y
-    else
-        -- Use block position for normal connections
-        targetX, targetY = self:getConnectionPointPosition(
-            conn.targetBlock, conn.inputIndex, true)
-    end
-    
-    -- Get connection type info
-    local sourceType = conn.sourceBlock.config.outputs[conn.outputIndex].type
-    local typeInfo = CONNECTION_TYPES[sourceType] or CONNECTION_TYPES.any
-    
-    -- Draw connection line with type color
-    love.graphics.setColor(unpack(typeInfo.color))
-    self:drawBezierConnection(sourceX, sourceY, targetX, targetY)
-end
-
-function ConnectionManager:drawBezierConnection(x1, y1, x2, y2)
-    local controlX = math.abs(x2 - x1) * 0.5
-    local points = {}
-    for t = 0, 1, 0.1 do
-        local px = self:bezierPoint(x1, x1 + controlX, x2 - controlX, x2, t)
-        local py = self:bezierPoint(y1, y1, y2, y2, t)
-        table.insert(points, px)
-        table.insert(points, py)
-    end
+    -- Draw connection line
+    love.graphics.setColor(0.8, 0.8, 1.0, 0.8)
     love.graphics.setLineWidth(2)
-    love.graphics.line(points)
+    
+    -- Draw bezier curve
+    local controlX1 = sourceX + 50
+    local controlX2 = targetX - 50
+    self:drawBezierConnection(
+        sourceX, sourceY,
+        controlX1, sourceY,
+        controlX2, targetY,
+        targetX, targetY
+    )
+    
+    -- Reset line width
     love.graphics.setLineWidth(1)
 end
 
-function ConnectionManager:bezierPoint(p0, p1, p2, p3, t)
-    local t2 = t * t
-    local t3 = t2 * t
-    return (1 - t)^3 * p0 + 3 * (1 - t)^2 * t * p1 + 
-           3 * (1 - t) * t2 * p2 + t3 * p3
+function ConnectionManager:drawDraggingConnection()
+    if not self.draggingConnection.source then return end
+    
+    local mx, my = love.mouse.getPosition()
+    local sourceX = self.draggingConnection.source.x + self.editor.blockWidth
+    local sourceY = self.draggingConnection.source.y + 
+                   (self.draggingConnection.outputIndex * 20) + 30
+    
+    -- Draw preview line
+    love.graphics.setColor(0.8, 0.8, 1.0, 0.5)
+    love.graphics.setLineWidth(2)
+    
+    -- Draw bezier curve for preview
+    local controlX1 = sourceX + 50
+    local controlX2 = mx - 50
+    self:drawBezierConnection(
+        sourceX, sourceY,
+        controlX1, sourceY,
+        controlX2, my,
+        mx, my
+    )
+    
+    -- Reset line width
+    love.graphics.setLineWidth(1)
+    
+    -- Draw snap indicator if hovering over valid connection point
+    local snapTarget = self:findSnapTarget(mx, my)
+    if snapTarget then
+        love.graphics.setColor(0.4, 1.0, 0.4, 0.8)
+        love.graphics.circle("fill", 
+            snapTarget.x, 
+            snapTarget.y, 
+            6)
+    end
+end
+
+function ConnectionManager:drawBezierConnection(x1, y1, x2, y2, x3, y3, x4, y4)
+    local segments = 20
+    local points = {}
+    
+    for i = 0, segments do
+        local t = i / segments
+        local px, py = self:bezierPoint(t, x1, y1, x2, y2, x3, y3, x4, y4)
+        table.insert(points, px)
+        table.insert(points, py)
+    end
+    
+    love.graphics.line(points)
+end
+
+function ConnectionManager:bezierPoint(t, x1, y1, x2, y2, x3, y3, x4, y4)
+    local t1 = (1 - t)
+    local t2 = t1 * t1
+    local t3 = t2 * t1
+    local tt = t * t
+    local ttt = tt * t
+    
+    return x1 * t3 + 3 * x2 * t2 * t + 3 * x3 * t1 * tt + x4 * ttt,
+           y1 * t3 + 3 * y2 * t2 * t + 3 * y3 * t1 * tt + y4 * ttt
 end
 
 function ConnectionManager:handleMousePressed(x, y, button)
@@ -415,9 +382,25 @@ function ConnectionManager:disconnectInput(block, inputIndex)
 end
 
 function ConnectionManager:update(dt)
-    -- Currently we don't need any per-frame updates for the connection manager
-    -- but we need the method to exist since it's called from BlockEditor:update()
-    return
 end
+
+function ConnectionManager:findSnapTarget(x, y)
+    -- Check all blocks for potential connection points
+    for _, block in ipairs(self.editor.blockManager.blocks) do
+        local connectionPoint = self:findConnectionPoint(block, x, y)
+        if connectionPoint then
+            -- Only return if the connection point is compatible and of opposite type
+            -- (input vs output) compared to what we're dragging
+            if self.draggingConnection and
+               self:isConnectionCompatible(self.draggingConnection.type, connectionPoint.type) and
+               self.draggingConnection.isInput ~= connectionPoint.isInput then
+                return connectionPoint
+            end
+        end
+    end
+    return nil
+end
+
+ConnectionManager.CONNECTION_TYPES = CONNECTION_TYPES
 
 return ConnectionManager 

@@ -1,86 +1,111 @@
 local UIManager = {}
 UIManager.__index = UIManager
 
-local UI = require "lib.ui"
+local EventSystem = require "block_editor.event_system"
+local Dialog = require "lib.ui.dialog"
+local ProgramMenu = require "lib.ui.program_menu"
+local Button = require "lib.ui.button"
 
 function UIManager.new(editor)
     local self = setmetatable({}, UIManager)
     self.editor = editor
-    self.activeDropdown = nil
+    self.events = EventSystem.new()
+    self.components = {}
     self.activeDialog = nil
-    self.showProgramMenu = false
-    self.programMenuX = love.graphics.getWidth() - 200
-    self.programMenuY = 10
-    self.programMenuWidth = 180
-    self.buttonHeight = 30
-    self.buttonSpacing = 5
     
-    -- Create program menu buttons once
-    self.programButtons = {
-        UI.Button.new(
-            self.programMenuX + 5,
-            self.programMenuY + 2,
-            self.programMenuWidth - 10,
-            self.buttonHeight - 4,
-            "Load Program",
-            function() self:handleProgramAction("load") end
-        ),
-        UI.Button.new(
-            self.programMenuX + 5,
-            self.programMenuY + 2 + self.buttonHeight + self.buttonSpacing,
-            self.programMenuWidth - 10,
-            self.buttonHeight - 4,
-            "Save Program",
-            function() self:handleProgramAction("save") end
-        ),
-        UI.Button.new(
-            self.programMenuX + 5,
-            self.programMenuY + 2 + 2 * (self.buttonHeight + self.buttonSpacing),
-            self.programMenuWidth - 10,
-            self.buttonHeight - 4,
-            "Apply to Group",
-            function() self:handleProgramAction("apply") end
-        ),
-        UI.Button.new(
-            self.programMenuX + 5,
-            self.programMenuY + 2 + 3 * (self.buttonHeight + self.buttonSpacing),
-            self.programMenuWidth - 10,
-            self.buttonHeight - 4,
-            "Clear Program",
-            function() self:handleProgramAction("clear") end
-        ),
-        UI.Button.new(
-            self.programMenuX + 5,
-            self.programMenuY + 2 + 4 * (self.buttonHeight + self.buttonSpacing),
-            self.programMenuWidth - 10,
-            self.buttonHeight - 4,
-            "Run Program",
-            function() self:handleProgramAction("run") end
-        )
-    }
+    -- Create program menu component
+    self.programMenu = ProgramMenu.new(self.events)
+    table.insert(self.components, self.programMenu)
+    
+    -- Create toolbar buttons
+    self:createToolbarButtons()
+    
+    -- Subscribe to events
+    self.events:subscribe("program_action", function(action)
+        self:handleProgramAction(action)
+    end)
+    
     return self
 end
 
-function UIManager:drawBackground()
-    -- Draw semi-transparent background
-    love.graphics.setColor(0, 0, 0, 0.8)
-    love.graphics.rectangle("fill", 0, 0, love.graphics.getWidth(), love.graphics.getHeight())
+function UIManager:createToolbarButtons()
+    local buttonWidth = 80
+    local buttonHeight = 30
+    local spacing = 10
+    local startX = 220  -- After palette
+    local startY = 10
+    
+    self.toolbarButtons = {
+        Button.new({
+            text = "New",
+            x = startX,
+            y = startY,
+            width = buttonWidth,
+            height = buttonHeight,
+            onClick = function() self:handleProgramAction("new") end
+        }),
+        Button.new({
+            text = "Load",
+            x = startX + (buttonWidth + spacing),
+            y = startY,
+            width = buttonWidth,
+            height = buttonHeight,
+            onClick = function() self:handleProgramAction("load") end
+        }),
+        Button.new({
+            text = "Save",
+            x = startX + (buttonWidth + spacing) * 2,
+            y = startY,
+            width = buttonWidth,
+            height = buttonHeight,
+            onClick = function() self:handleProgramAction("save") end
+        }),
+        Button.new({
+            text = "Clear",
+            x = startX + (buttonWidth + spacing) * 3,
+            y = startY,
+            width = buttonWidth,
+            height = buttonHeight,
+            onClick = function() self:handleProgramAction("clear") end
+        }),
+        Button.new({
+            text = "Apply",
+            x = startX + (buttonWidth + spacing) * 4,
+            y = startY,
+            width = buttonWidth,
+            height = buttonHeight,
+            onClick = function() self:handleProgramAction("apply") end
+        })
+    }
+    
+    -- Add buttons to components list
+    for _, button in ipairs(self.toolbarButtons) do
+        table.insert(self.components, button)
+    end
 end
 
-function UIManager:drawOverlay()
-    -- Draw program management menu
-    if self.editor.editorVisible then
-        self:drawProgramMenu()
+function UIManager:draw()
+    if not self.editor.editorVisible then return end
+    
+    self:drawBackground()
+    
+    -- Draw all components
+    for _, component in ipairs(self.components) do
+        if component.visible then
+            component:draw()
+        end
     end
-
-    -- Draw active dropdown if any
-    if self.activeDropdown then
-        self:drawDropdownMenu(self.activeDropdown)
+    
+    -- Draw current program name if one is loaded
+    if self.editor.currentProgram then
+        love.graphics.setColor(1, 1, 1, 0.8)
+        love.graphics.print("Current Program: " .. self.editor.currentProgram,
+            220, 45)  -- Position below toolbar buttons
     end
     
     -- Draw active dialog if any
     if self.activeDialog then
-        self:drawDialog(self.activeDialog)
+        self.activeDialog:draw()
     end
     
     -- Draw help overlay if enabled
@@ -89,87 +114,37 @@ function UIManager:drawOverlay()
     end
 end
 
-function UIManager:drawDropdownMenu(dropdown)
+function UIManager:drawBackground()
     -- Draw semi-transparent background
-    love.graphics.setColor(0, 0, 0, 0.5)
+    love.graphics.setColor(0, 0, 0, 0.8)
     love.graphics.rectangle("fill", 0, 0, love.graphics.getWidth(), love.graphics.getHeight())
-    
-    -- Draw dropdown background
-    love.graphics.setColor(0.2, 0.2, 0.2, 0.95)
-    love.graphics.rectangle("fill", 
-        dropdown.x, 
-        dropdown.y, 
-        dropdown.width, 
-        #dropdown.options * 20)
-    
-    -- Draw options
-    local mx, my = love.mouse.getPosition()
-    for i, option in ipairs(dropdown.options) do
-        local y = dropdown.y + (i-1) * 20
-        
-        -- Highlight hovered option
-        if mx >= dropdown.x and mx <= dropdown.x + dropdown.width and
-           my >= y and my <= y + 20 then
-            love.graphics.setColor(0.4, 0.4, 0.6)
-            love.graphics.rectangle("fill", dropdown.x, y, dropdown.width, 20)
-        -- Highlight current value
-        elseif option == dropdown.currentValue then
-            love.graphics.setColor(0.3, 0.3, 0.4)
-            love.graphics.rectangle("fill", dropdown.x, y, dropdown.width, 20)
-        end
-        
-        -- Draw option text
-        love.graphics.setColor(1, 1, 1)
-        love.graphics.print(option, dropdown.x + 5, y + 2)
-    end
-end
-
-function UIManager:drawProgramMenu()
-    -- Draw menu background
-    love.graphics.setColor(0.2, 0.2, 0.2, 0.9)
-    love.graphics.rectangle("fill", 
-        self.programMenuX, 
-        self.programMenuY, 
-        self.programMenuWidth, 
-        self.buttonHeight * 5 + self.buttonSpacing * 4)
-
-    -- Draw the buttons
-    for _, button in ipairs(self.programButtons) do
-        button:draw()
-    end
-end
-
-function UIManager:isMouseOverButton(button, y)
-    local mx, my = love.mouse.getPosition()
-    return mx >= self.programMenuX + 5 and
-           mx <= self.programMenuX + self.programMenuWidth - 5 and
-           my >= y + 2 and
-           my <= y + self.buttonHeight - 2
 end
 
 function UIManager:handleMousePressed(x, y, button)
-    if button ~= 1 then return false end
+    if not self.editor.editorVisible then return false end
     
-    -- Check program menu buttons
-    if self.editor.editorVisible then
-        local mx, my = love.mouse.getPosition()
-        for _, btn in ipairs(self.programButtons) do
-            if btn:isHovered(mx, my) then
-                btn.action()
-                return true
-            end
+    -- Handle active dialog first
+    if self.activeDialog and self.activeDialog:handleMousePressed(x, y, button) then
+        return true
+    end
+    
+    -- Delegate to components
+    for _, component in ipairs(self.components) do
+        if component.visible and component:handleMousePressed(x, y, button) then
+            return true
         end
     end
-    
-    -- Handle active dropdown
-    if self.activeDropdown then
-        return self.activeDropdown:handleClick(x, y)
-    end
-    
     return false
 end
 
 function UIManager:handleMouseReleased(x, y, button)
+    if not self.editor.editorVisible then return false end
+    
+    for _, component in ipairs(self.components) do
+        if component.visible and component:handleMouseReleased(x, y, button) then
+            return true
+        end
+    end
     return false
 end
 
@@ -179,6 +154,20 @@ end
 
 function UIManager:handleWheelMoved(x, y)
     return false
+end
+
+function UIManager:update(dt)
+    -- Update all visible components
+    for _, component in ipairs(self.components) do
+        if component.visible and component.update then
+            component:update(dt)
+        end
+    end
+    
+    -- Update active dialog if any
+    if self.activeDialog and self.activeDialog.update then
+        self.activeDialog:update(dt)
+    end
 end
 
 function UIManager:drawHelp()
@@ -202,6 +191,13 @@ function UIManager:drawHelp()
         "- Delete: Remove selected block",
         "- Escape: Close dropdowns/dialogs",
         "",
+        "Toolbar:",
+        "- New: Create a new program",
+        "- Load: Load an existing program",
+        "- Save: Save current program",
+        "- Clear: Clear all blocks",
+        "- Apply: Apply program to selected boids",
+        "",
         "Blocks:",
         "- Drag blocks from the palette on the left",
         "- Connect blocks by dragging from output to input points",
@@ -218,46 +214,72 @@ end
 
 function UIManager:handleKeyPressed(key)
     if key == "escape" then
-        self.activeDropdown = nil
         self.activeDialog = nil
         self.editor.showHelp = false
         return true
     elseif key == "h" then
         self.editor.showHelp = not self.editor.showHelp
         return true
+    elseif self.activeDialog then
+        return self.activeDialog:handleKeyPressed(key)
     end
     return false
 end
 
-function UIManager:update(dt)
-    -- Add any necessary update logic
-end
-
 function UIManager:handleProgramAction(action)
-    if action == "load" then
-        -- Show program selection dialog
+    if action == "new" then
+        self.activeDialog = Dialog.new({
+            type = "input",
+            title = "New Program",
+            callback = function(name)
+                if name and name ~= "" then
+                    self.editor:newProgram(name)
+                end
+                self.activeDialog = nil
+            end
+        })
+    elseif action == "save" then
+        if self.editor.currentProgram then
+            self.editor:saveProgram(self.editor.currentProgram)
+        else
+            self.activeDialog = Dialog.new({
+                type = "input",
+                title = "Save Program As",
+                callback = function(name)
+                    if name and name ~= "" then
+                        self.editor:saveProgram(name)
+                        self.editor.currentProgram = name
+                    end
+                    self.activeDialog = nil
+                end
+            })
+        end
+    elseif action == "load" then
+        -- Get list of saved programs
         local files = love.filesystem.getDirectoryItems("programs")
         local programs = {}
         for _, file in ipairs(files) do
-            if file:match("%.lua$") then
-                table.insert(programs, file:gsub("%.lua$", ""))
+            -- Remove .lua extension
+            local name = file:match("(.+)%.lua$")
+            if name then
+                table.insert(programs, name)
             end
         end
         
-        if #programs > 0 then
-            -- For now, just load the first program
-            -- TODO: Add proper program selection UI
-            self.editor:loadProgram(programs[1])
-        end
-        
-    elseif action == "save" then
-        local name = (self.editor.currentProgram or "program_") .. os.time()
-        self.editor:saveProgram(name)
-        
+        self.activeDialog = Dialog.new({
+            type = "select",
+            title = "Load Program",
+            options = programs,
+            callback = function(name)
+                if name then
+                    self.editor:loadProgram(name)
+                end
+                self.activeDialog = nil
+            end
+        })
     elseif action == "clear" then
         self.editor:newProgram()
-        
-    elseif action == "apply" or action == "run" then
+    elseif action == "apply" then
         -- Get selected boids and apply program
         local selectedBoids = self.editor.boidManager.selectionManager:getSelectedBoids()
         if #selectedBoids > 0 then
@@ -269,19 +291,11 @@ function UIManager:handleProgramAction(action)
     end
 end
 
-function UIManager:serializeTable(tbl)
-    local result = "{"
-    for k, v in pairs(tbl) do
-        local key = type(k) == "number" and k or string.format("[%q]", k)
-        if type(v) == "table" then
-            result = result .. string.format("%s=%s,", key, self:serializeTable(v))
-        elseif type(v) == "string" then
-            result = result .. string.format("%s=%q,", key, v)
-        else
-            result = result .. string.format("%s=%s,", key, tostring(v))
-        end
+function UIManager:textinput(text)
+    if self.activeDialog then
+        return self.activeDialog:handleTextInput(text)
     end
-    return result .. "}"
+    return false
 end
 
 return UIManager 

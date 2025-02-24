@@ -17,13 +17,19 @@ function BlockManager.new(editor)
     return self
 end
 
+function BlockManager:draw()
+    -- Draw all blocks
+    self:drawBlocks()
+    
+    -- Draw any dragged block
+    if self.draggingBlock then
+        self:drawBlock(self.draggingBlock)
+    end
+end
+
 function BlockManager:drawBlocks()
     for _, block in ipairs(self.blocks) do
         self:drawBlock(block)
-    end
-    
-    if self.draggingBlock then
-        self:drawBlock(self.draggingBlock)
     end
 end
 
@@ -33,6 +39,13 @@ function BlockManager:drawBlock(block)
     love.graphics.rectangle("fill", block.x, block.y, 
         self.editor.blockWidth, self.editor.blockHeight)
     
+    -- Draw selection highlight if this is the selected block
+    if block == self.selectedBlock then
+        love.graphics.setColor(1, 1, 1, 0.3)
+        love.graphics.rectangle("line", block.x - 2, block.y - 2,
+            self.editor.blockWidth + 4, self.editor.blockHeight + 4)
+    end
+    
     -- Draw block name and icon
     love.graphics.setColor(1, 1, 1)
     love.graphics.print(block.config.name, block.x + 5, block.y + 5)
@@ -41,7 +54,7 @@ function BlockManager:drawBlock(block)
             block.x + self.editor.blockWidth - 20, block.y + 5)
     end
     
-    -- Draw parameters first
+    -- Draw parameters
     if block.config.params then
         local paramY = block.y + 30
         for _, param in ipairs(block.config.params) do
@@ -51,75 +64,62 @@ function BlockManager:drawBlock(block)
         end
     end
     
-    -- Draw connection points on top
-    if block.config.inputs then
-        for i, input in ipairs(block.config.inputs) do
-            local px, py = self:getConnectionPointPosition(block, i, true)
-            -- Draw input label
-            love.graphics.setColor(0.7, 0.7, 0.7)
-            love.graphics.print(input.name or "", px + 10, py - 7)
-            -- Draw connection point
-            self.editor.connectionManager:drawConnectionPoint(px, py, input.type, true)
-        end
-    end
-    
-    if block.config.outputs then
-        for i, output in ipairs(block.config.outputs) do
-            local px, py = self:getConnectionPointPosition(block, i, false)
-            -- Draw output label
-            love.graphics.setColor(0.7, 0.7, 0.7)
-            local name = output.name or ""
-            local width = love.graphics.getFont():getWidth(name)
-            love.graphics.print(name, px - width - 10, py - 7)
-            -- Draw connection point
-            self.editor.connectionManager:drawConnectionPoint(px, py, output.type, false)
-        end
-    end
+    -- Draw connection points
+    self:drawConnectionPoints(block)
 end
 
 function BlockManager:drawParameter(param, value, x, y)
+    -- Get parameter type configuration
     local paramType = PARAMETER_TYPES[param.type]
-    if not paramType or not paramType.draw then return end
+    if not paramType then return end
     
-    -- Draw the parameter
-    paramType.draw(param, value, x, y, self.editor.blockWidth - 20)
+    -- Draw parameter label
+    love.graphics.setColor(0.8, 0.8, 0.8)
+    love.graphics.print(param.name .. ":", x, y)
     
-    -- Handle input if needed
-    if love.mouse.isDown(1) and paramType.handleInput then
-        local newValue = paramType.handleInput(param, value, x, y, 
-            self.editor.blockWidth - 20, self.editor)
-        
-        if newValue ~= value then
-            -- Update the block parameter
-            if self.selectedBlock then
-                self.selectedBlock.params[param.name] = newValue
-                -- Trigger any block-specific update logic
-                if self.selectedBlock.onParamChanged then
-                    self.selectedBlock:onParamChanged(param.name, newValue)
-                end
-            end
-        end
+    -- Draw parameter value using type-specific drawing function
+    if paramType.draw then
+        paramType.draw(param, value, x + 80, y, 
+            self.editor.blockWidth - 100, self.editor)
     end
 end
 
 function BlockManager:drawConnectionPoints(block)
     -- Draw input connection points
     if block.config.inputs then
-        love.graphics.setColor(0.8, 0.8, 0.8)
-        for i, _ in ipairs(block.config.inputs) do
+        for i, input in ipairs(block.config.inputs) do
             local px, py = self:getConnectionPointPosition(block, i, true)
-            love.graphics.circle("fill", px, py, 4)
+            self:drawConnectionPoint(px, py, input.type, true)
         end
     end
     
     -- Draw output connection points
     if block.config.outputs then
-        love.graphics.setColor(0.8, 0.8, 0.8)
-        for i, _ in ipairs(block.config.outputs) do
+        for i, output in ipairs(block.config.outputs) do
             local px, py = self:getConnectionPointPosition(block, i, false)
-            love.graphics.circle("fill", px, py, 4)
+            self:drawConnectionPoint(px, py, output.type, false)
         end
     end
+end
+
+function BlockManager:drawConnectionPoint(x, y, type, isInput)
+    -- Get connection type configuration
+    local typeInfo = self.editor.connectionManager.CONNECTION_TYPES[type] or 
+                    self.editor.connectionManager.CONNECTION_TYPES.any
+    
+    -- Draw connection point with type-specific styling
+    love.graphics.setColor(unpack(typeInfo.color))
+    
+    -- Draw the connection point shape
+    if isInput then
+        love.graphics.circle("fill", x, y, 4)
+    else
+        love.graphics.circle("fill", x, y, 4)
+    end
+    
+    -- Draw outline
+    love.graphics.setColor(1, 1, 1, 0.5)
+    love.graphics.circle("line", x, y, 5)
 end
 
 function BlockManager:getConnectionPointPosition(block, index, isInput)
@@ -240,8 +240,6 @@ function BlockManager:handleKeyPressed(key)
     return false
 end
 
-function BlockManager:update(dt)
-    -- Add any necessary update logic
-end
+function BlockManager:update(dt) end
 
 return BlockManager 
