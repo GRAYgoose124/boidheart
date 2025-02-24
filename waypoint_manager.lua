@@ -3,7 +3,7 @@ WaypointManager.__index = WaypointManager
 
 function WaypointManager.new()
     local self = setmetatable({}, WaypointManager)
-    self.paths = {}  -- Maps boid groups to their waypoint paths
+    self.paths = {}  -- Maps group IDs to their waypoint paths
     self.currentGroupId = 1
     return self
 end
@@ -28,7 +28,6 @@ function WaypointManager:getNextWaypoint(groupId, currentX, currentY)
     local dy = waypoint.y - currentY
     local distance = dx * dx + dy * dy
     
-    -- If close enough to current waypoint, cycle to next
     if distance < 150 then
         table.remove(path, 1)
         table.insert(path, waypoint)
@@ -40,6 +39,10 @@ end
 
 function WaypointManager:clearPath(groupId)
     self.paths[groupId] = {}
+end
+
+function WaypointManager:setCurrentGroup(groupId)
+    self.currentGroupId = groupId
 end
 
 function WaypointManager:draw()
@@ -55,14 +58,6 @@ function WaypointManager:draw()
                 love.graphics.circle("line", waypoint.x, waypoint.y, 10)
             end
         end
-    end
-end
-
-
-function WaypointManager:cycleGroupId()
-    self.currentGroupId = self.currentGroupId + 1
-    if self.currentGroupId > #self.paths then
-        self.currentGroupId = 0
     end
 end
 

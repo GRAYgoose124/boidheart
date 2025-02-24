@@ -71,6 +71,7 @@ function Boid:update(dt)
         end
         
         if shouldExecute and state.active then
+            local cooldown = nil
             for _, action in ipairs(actions) do
                 if action.type == "RANDOM" then
                     -- Handle random path selection
@@ -89,10 +90,11 @@ function Boid:update(dt)
                     end
                 else
                     self:executeAction(action)
+                    cooldown = action.cooldown or 0
                 end
             end
             
-            state.cooldown = action.cooldown or 0
+            state.cooldown = cooldown
         end
         
         ::continue::

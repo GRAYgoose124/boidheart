@@ -4,6 +4,8 @@ BoidManager.__index = BoidManager
 -- Add to the top of the file after other requires
 local BlockEditor = require "editors.block_editor"
 local ShaderManager = require "shader_manager"
+local SelectionManager = require "selection_manager"
+local WaypointManager = require "waypoint_manager"
 
 function BoidManager.new(maxBoids)
     local self = setmetatable({}, BoidManager)
@@ -12,13 +14,8 @@ function BoidManager.new(maxBoids)
     self.player = nil
     
     self.shaderManager = ShaderManager.new(maxBoids)
-    
-    self.waypointManager = require("waypoint_manager").new()
-    self.selectionRadius = 100
-    self.selecting = false
-    self.selectionX = 0
-    self.selectionY = 0
-    
+    self.selectionManager = SelectionManager.new(self)
+    self.waypointManager = WaypointManager.new()
     self.blockEditor = BlockEditor.new()
     
     return self
@@ -41,11 +38,8 @@ function BoidManager:update(dt)
 end
 
 function BoidManager:draw()
-    -- Draw selection circle if selecting
-    if self.selecting then
-        love.graphics.setColor(0, 1, 1, 0.3)
-        love.graphics.circle("line", self.selectionX, self.selectionY, self.selectionRadius)
-    end
+    -- Draw selection UI
+    self.selectionManager:draw()
     
     -- Draw waypoints
     self.waypointManager:draw()
@@ -63,47 +57,6 @@ function BoidManager:draw()
     
     -- Draw block editor on top
     self.blockEditor:draw()
-end
-
-function BoidManager:startSelection(x, y)
-    self.selecting = true
-    self.selectionX = x
-    self.selectionY = y
-end
-
-function BoidManager:endSelection()
-    self.selecting = false
-    local selectedCount = 0
-    local newGroupId = #self.waypointManager.paths + 1
-    for _, boid in ipairs(self.boids) do
-        if boid.selected then
-            boid.groupId = newGroupId
-            selectedCount = selectedCount + 1
-        end
-    end
-    
-    if selectedCount > 0 then
-        self.waypointManager:createPath(newGroupId)
-        self.waypointManager.currentGroupId = newGroupId
-    end
-end
-
-function BoidManager:updateSelection(x, y)
-    for _, boid in ipairs(self.boids) do
-        local dx = boid.x - x
-        local dy = boid.y - y
-        local distance = math.sqrt(dx * dx + dy * dy)
-        boid.selected = distance <= self.selectionRadius
-    end
-end
-
-function BoidManager:cycleGroupSelection()
-    self.waypointManager:cycleGroupId()
-    local nextGroup = self.waypointManager.currentGroupId
-    -- Deselect all and select new group
-    for _, boid in ipairs(self.boids) do
-        boid.selected = (boid.groupId == nextGroup)
-    end
 end
 
 function BoidManager:setPlayer(player)

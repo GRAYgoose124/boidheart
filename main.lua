@@ -5,7 +5,6 @@ local BoidManager = require "boid_manager"
 
 local player
 local boidManager
-local selecting = false
 
 function love.load()
     love.window.setTitle("Boids Follower")
@@ -88,28 +87,31 @@ function love.keypressed(key)
             boidManager.blockEditor.showHelp = not boidManager.blockEditor.showHelp
         elseif key == "return" then
             boidManager.blockEditor:applyToSelected(boidManager.boids)
+        elseif key == "b" then
+            boidManager.blockEditor:toggle()
         end
         return
     end
     
     if key == "space" then
-        selecting = not selecting
-        if selecting then
+        local selectionManager = boidManager.selectionManager
+        if not selectionManager.selecting then
             local x, y = love.mouse.getPosition()
-            boidManager:startSelection(x, y)
+            selectionManager:startSelection(x, y)
         else
-            boidManager:endSelection()
-            boidManager.waypointManager:createPath(boidManager.waypointManager.currentGroupId)
+            selectionManager:endSelection()
         end
     elseif key == "delete" then
         -- Clear waypoints for selected boids
-        for _, boid in ipairs(boidManager.boids) do
-            if boid.selected and boid.groupId then
+        local selectedBoids = boidManager.selectionManager:getSelectedBoids()
+        for _, boid in ipairs(selectedBoids) do
+            if boid.groupId then
                 boidManager.waypointManager:clearPath(boid.groupId)
             end
         end
     elseif key == "tab" then
-        boidManager:cycleGroupSelection()
+        local nextGroup = boidManager.selectionManager:cycleGroupSelection(boidManager.boids)
+        boidManager.waypointManager:setCurrentGroup(nextGroup)
     elseif key == "b" then
         boidManager.blockEditor:toggle()
     elseif key == "f" then
@@ -122,10 +124,10 @@ function love.mousemoved(x, y)
         boidManager.blockEditor:mousemoved(x, y)
         return
     end
-    if selecting then
-        boidManager.selectionX = x
-        boidManager.selectionY = y
-        boidManager:updateSelection(x, y)
+    
+    local selectionManager = boidManager.selectionManager
+    if selectionManager.selecting then
+        selectionManager:updateSelection(x, y, boidManager.boids)
     end
 end
 
@@ -134,10 +136,12 @@ function love.mousepressed(x, y, button)
         boidManager.blockEditor:mousepressed(x, y, button)
         return
     end
-    if button == 1 and not selecting then
+    
+    if button == 1 and not boidManager.selectionManager.selecting then
         -- Add waypoint for selected boids
-        for _, boid in ipairs(boidManager.boids) do
-            if boid.selected and boid.groupId then
+        local selectedBoids = boidManager.selectionManager:getSelectedBoids()
+        for _, boid in ipairs(selectedBoids) do
+            if boid.groupId then
                 boidManager.waypointManager:addWaypoint(boid.groupId, x, y)
             end
         end
