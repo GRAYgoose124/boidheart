@@ -68,17 +68,23 @@ function ConnectionManager:drawConnection(connection)
     -- Get connection points using the helper method
     local startX, startY, endX, endY = connection:getPoints(self)
     
-    -- Calculate control points for bezier curve
-    local controlX = (endX - startX) * 0.5
+    -- Calculate control points for bezier curve considering both x and y differences
+    local dx = math.abs(endX - startX)
+    local dy = endY - startY
+    local controlX = dx * 0.5
+    local controlY = dy * 0.5
+    
     local x2 = startX + controlX
+    local y2 = startY + controlY * 0.2  -- Reduce vertical influence near start
     local x3 = endX - controlX
+    local y3 = endY - controlY * 0.2    -- Reduce vertical influence near end
     
     -- Get connection type info with fallback to 'any'
     local typeInfo = CONNECTION_TYPES[connection.type] or CONNECTION_TYPES.any
     
     -- Draw the connection
     love.graphics.setColor(unpack(typeInfo.color))
-    self:drawBezierConnection(startX, startY, x2, startY, x3, endY, endX, endY)
+    self:drawBezierConnection(startX, startY, x2, y2, x3, y3, endX, endY)
 end
 
 function ConnectionManager:drawDraggingConnection()
@@ -107,13 +113,21 @@ function ConnectionManager:drawDraggingConnection()
     love.graphics.setColor(0.8, 0.8, 1.0, 0.5)
     love.graphics.setLineWidth(2)
     
-    -- Draw bezier curve for preview
-    local controlX1 = startX + (mx - startX) * 0.5
-    local controlX2 = mx - (mx - startX) * 0.5
+    -- Draw bezier curve for preview with improved control points
+    local dx = math.abs(mx - startX)
+    local dy = my - startY
+    local controlX = dx * 0.5
+    local controlY = dy * 0.5
+    
+    local x2 = startX + controlX
+    local y2 = startY + controlY * 0.2  -- Reduce vertical influence near start
+    local x3 = mx - controlX
+    local y3 = my - controlY * 0.2      -- Reduce vertical influence near end
+    
     self:drawBezierConnection(
         startX, startY,
-        controlX1, startY,
-        controlX2, my,
+        x2, y2,
+        x3, y3,
         mx, my
     )
     

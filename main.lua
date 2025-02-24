@@ -87,7 +87,11 @@ function love.keypressed(key)
         elseif key == "h" then
             blockEditor.showHelp = not blockEditor.showHelp
         elseif key == "return" then
-            blockEditor:applyToSelected(boidManager.boids)
+            -- Get selected boids before attempting to apply program
+            local selectedBoids = boidManager.selectionManager:getSelectedBoids()
+            if #selectedBoids > 0 then
+                blockEditor:applyToSelected(boidManager.boids)
+            end
         elseif key == "b" then
             blockEditor:toggle()
         end
